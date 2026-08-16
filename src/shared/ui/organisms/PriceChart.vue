@@ -442,8 +442,8 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
       </div>
     </div>
 
-    <!-- Single toolbar row: [+ Indicator][chips scrollable][spacer][period pills][fullscreen] -->
-    <div class="flex items-center gap-1.5 px-1 pb-2.5">
+    <!-- Toolbar row: [+ Indicator] [period pills] [fullscreen] — compact on all sizes -->
+    <div class="flex items-center gap-1.5 px-1 pb-2">
       <button
         type="button"
         class="shrink-0 flex items-center gap-1 px-2.5 h-8 rounded-lg border border-terminal-accent/40 bg-terminal-accent/10 text-terminal-accent text-xs font-mono font-bold hover:bg-terminal-accent/20 active:scale-95 transition-all"
@@ -453,23 +453,14 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
         <span>Indicator</span>
       </button>
 
-      <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0">
-        <span
-          v-for="def in activeIndicators"
-          :key="def.key"
-          class="shrink-0 inline-flex items-center gap-1 h-8 pl-2.5 pr-1 rounded-lg border text-[11px] font-mono font-bold cursor-pointer active:scale-95 transition-all"
-          :style="{ borderColor: def.color + '70', color: def.color, backgroundColor: def.color + '18' }"
-          @click="openAnalysis(def)"
-        >
-          {{ indicatorLabel(def) }}
-          <button
-            type="button"
-            class="w-5 h-5 flex items-center justify-center rounded hover:bg-white/15 text-current opacity-80"
-            @click.stop="removeIndicator(def.key)"
-            aria-label="Remove indicator"
-          >✕</button>
-        </span>
-      </div>
+      <span
+        v-if="activeIndicators.length > 0"
+        class="shrink-0 text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider px-1"
+      >
+        {{ activeIndicators.length }} active
+      </span>
+
+      <div class="flex-1" />
 
       <div class="shrink-0 flex items-center bg-terminal-bg/60 border border-white/10 rounded-lg p-0.5">
         <button
@@ -489,6 +480,25 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
         :title="isFullscreen ? 'Exit full screen' : 'View in full screen'"
         @click="toggleFullscreen"
       >{{ isFullscreen ? '✕' : '⤢' }}</button>
+    </div>
+
+    <!-- Active indicator chips — wrap on all sizes so nothing is hidden -->
+    <div v-if="activeIndicators.length > 0" class="flex flex-wrap gap-1.5 px-1 pb-2.5">
+      <span
+        v-for="def in activeIndicators"
+        :key="def.key"
+        class="inline-flex items-center gap-1 h-8 pl-2.5 pr-1 rounded-lg border text-[11px] font-mono font-bold cursor-pointer active:scale-95 transition-all"
+        :style="{ borderColor: def.color + '70', color: def.color, backgroundColor: def.color + '18' }"
+        @click="openAnalysis(def)"
+      >
+        {{ indicatorLabel(def) }}
+        <button
+          type="button"
+          class="w-5 h-5 flex items-center justify-center rounded hover:bg-white/15 text-current opacity-80"
+          @click.stop="removeIndicator(def.key)"
+          aria-label="Remove indicator"
+        >✕</button>
+      </span>
     </div>
 
     <!-- Indicator picker (bottom sheet on mobile, dialog on desktop) -->

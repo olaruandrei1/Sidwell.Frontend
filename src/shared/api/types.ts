@@ -435,6 +435,7 @@ export interface MonthlyFinanceSummaryDto {
   freeCash: string;
   savingsRatePct: string;
   totalExtraIncomes?: string;
+  totalExtraIncomesInRon?: string | null;
   brokerNetInvested?: BrokerNetInvestedDto[];
 }
 

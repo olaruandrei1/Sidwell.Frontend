@@ -173,17 +173,28 @@ const calculateGroupTotal = (holdings: HoldingDto[]): string => {
           {{ t('portfolio.recalcAll') }}
         </button>
 
-        <!-- Add Transaction -->
+        <!-- Add Transaction — desktop inline button -->
         <button
           type="button"
           @click="isAddOpen = true"
-          class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-terminal-accent text-terminal-bg hover:opacity-90 active:scale-95 transition-all duration-150"
+          class="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold bg-terminal-accent text-terminal-bg hover:opacity-90 active:scale-95 transition-all duration-150"
         >
           <Plus :size="14" />
           Add Transaction
         </button>
       </div>
     </div>
+
+    <!-- Add Transaction — mobile FAB (round, bottom-right, floats above navbar) -->
+    <button
+      type="button"
+      @click="isAddOpen = true"
+      class="sm:hidden fixed z-50 right-4 w-14 h-14 rounded-full bg-terminal-accent text-terminal-bg shadow-2xl flex items-center justify-center active:scale-90 transition-transform"
+      :style="{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 90px)' }"
+      aria-label="Add Transaction"
+    >
+      <Plus :size="26" :stroke-width="2.5" />
+    </button>
 
     <!-- Suspicious PnL banner -->
     <div

@@ -874,7 +874,7 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
           </p>
           <p class="text-[11px] font-mono text-gray-500">{{ displayCurrency }}<span v-if="isNonRonIncome"> · {{ data.settings.monthlyIncome.amount }} {{ data.settings.monthlyIncome.currency }}</span></p>
           <p v-if="data.summary.totalExtraIncomes && parseFloat(data.summary.totalExtraIncomes) > 0" class="text-[10px] font-mono text-amber-400/80 mt-0.5">
-            + {{ formatNumber(data.summary.totalExtraIncomes || '0') }} ocazional
+            + {{ formatNumber((displayCurrency === 'RON' && data.summary.totalExtraIncomesInRon) ? data.summary.totalExtraIncomesInRon : (data.summary.totalExtraIncomes || '0')) }} {{ displayCurrency === 'RON' && data.summary.totalExtraIncomesInRon ? 'RON' : data.summary.currency }} ocazional
           </p>
         </template>
       </div>
