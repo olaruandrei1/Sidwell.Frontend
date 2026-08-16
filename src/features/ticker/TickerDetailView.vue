@@ -29,6 +29,7 @@ import TickerNewsCarousel from './components/TickerNewsCarousel.vue';
 import TickerGrowthProjection from './components/TickerGrowthProjection.vue';
 import TickerUserHoldingsSection from './components/TickerUserHoldingsSection.vue';
 import TickerNotesSection from './components/TickerNotesSection.vue';
+import ReportShortcutButtons from './components/ReportShortcutButtons.vue';
 import type { DividendProjectionDto, AlgoScore, FundamentalPeriod } from '../../shared/api/types';
 
 const route = useRoute();
@@ -513,6 +514,10 @@ const rangePercent = computed(() => {
 
     <!-- ── Verdict ─────────────────────────────────────────────────────────── -->
     <TickerVerdictCard v-if="!loadingDetail" :verdict="verdict" :is-loading="loadingVerdict" :is-error="verdictError" />
+
+    <div v-if="!loadingDetail" class="flex justify-end">
+      <ReportShortcutButtons :symbol="symbol" />
+    </div>
 
     <!-- ── Chart + Algorithms (Fluid Flexbox layout) ───────────────────────── -->
     <div v-if="!loadingDetail" class="flex flex-wrap w-full gap-6 items-start">

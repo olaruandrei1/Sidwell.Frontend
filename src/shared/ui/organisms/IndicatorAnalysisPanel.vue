@@ -96,8 +96,10 @@ const title = computed(() => {
   return `${label} — ${info.value?.name ?? ''}`;
 });
 
-function formatValue(v: number): string {
-  return Math.abs(v) >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v.toFixed(2);
+function formatValue(v: number | string): string {
+  const num = typeof v === 'number' ? v : parseFloat(String(v));
+  if (!Number.isFinite(num)) return '—';
+  return Math.abs(num) >= 1000 ? num.toLocaleString(undefined, { maximumFractionDigits: 0 }) : num.toFixed(2);
 }
 </script>
 

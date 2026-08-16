@@ -1,11 +1,36 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { createChart, type IChartApi, type ISeriesApi, type MouseEventParams, ColorType, LineStyle } from 'lightweight-charts';
-
-type AnySeries = ISeriesApi<'Line'> | ISeriesApi<'Histogram'>;
-import type { PriceBar } from '../../api/types';
+import { ref, computed, watch, onMounted, onUnmounted, shallowRef } from 'vue';
+import { use } from 'echarts/core';
+import VChart, { THEME_KEY } from 'vue-echarts';
+import { CanvasRenderer } from 'echarts/renderers';
+import { CandlestickChart, LineChart, BarChart } from 'echarts/charts';
+import {
+  GridComponent,
+  TooltipComponent,
+  AxisPointerComponent,
+  LegendComponent,
+  DataZoomComponent,
+  MarkLineComponent
+} from 'echarts/components';
+import type { EChartsOption } from 'echarts';
+import { provide } from 'vue';
+import type { PriceBar, IndicatorSeriesDto, IndicatorPointDto } from '../../api/types';
 import { useTickerIndicatorsQuery } from '../../../queries/useTickerIndicatorsQuery';
+import { useThemeStore } from '../../../stores/theme';
 import IndicatorAnalysisPanel from './IndicatorAnalysisPanel.vue';
+
+use([
+  CanvasRenderer,
+  CandlestickChart,
+  LineChart,
+  BarChart,
+  GridComponent,
+  TooltipComponent,
+  AxisPointerComponent,
+  LegendComponent,
+  DataZoomComponent,
+  MarkLineComponent
+]);
 
 const props = defineProps<{
   bars: PriceBar[];
@@ -13,10 +38,28 @@ const props = defineProps<{
   symbol: string;
 }>();
 
+const themeStore = useThemeStore();
+provide(THEME_KEY, computed(() => (themeStore.mode === 'dark' ? 'dark' : 'default')));
+
+const palette = computed(() => {
+  const dark = themeStore.mode === 'dark';
+  return {
+    up: '#00E599',
+    down: '#F43F5E',
+    text: dark ? '#94A3B8' : '#475569',
+    textStrong: dark ? '#E2E8F0' : '#0F172A',
+    grid: dark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
+    axisLine: dark ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)',
+    bg: 'transparent',
+    tooltipBg: dark ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.98)',
+    tooltipBorder: dark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.12)'
+  };
+});
+
+// ── period filter ────────────────────────────────────────────────────────
 type Period = '1Y' | '3Y' | '5Y';
 const selectedPeriod = ref<Period>('1Y');
 const periods: Period[] = ['1Y', '3Y', '5Y'];
-
 const cutoffDays: Record<Period, number> = { '1Y': 365, '3Y': 1095, '5Y': 1825 };
 
 const filteredBars = computed(() => {
@@ -71,19 +114,15 @@ const { data: indicatorData } = useTickerIndicatorsQuery(computed(() => props.sy
 function buildKey(kind: IndicatorKind, period: number): string {
   return PARAMETERLESS_KINDS.includes(kind) ? kind : `${kind}${period}`;
 }
-
 function addIndicator(kind: IndicatorKind, period: number) {
   const effectivePeriod = PARAMETERLESS_KINDS.includes(kind) ? 0 : period;
   const key = buildKey(kind, effectivePeriod);
   if (activeIndicators.value.some((i) => i.key === key)) return;
   activeIndicators.value = [...activeIndicators.value, { key, kind, period: effectivePeriod, color: nextColor() }];
 }
-function addFromDropdown() {
-  addIndicator(newIndicatorKind.value, newIndicatorPeriod.value);
-}
+function addFromDropdown() { addIndicator(newIndicatorKind.value, newIndicatorPeriod.value); }
 function removeIndicator(key: string) {
   activeIndicators.value = activeIndicators.value.filter((i) => i.key !== key);
-  removeIndicatorSeries(key);
 }
 function indicatorLabel(def: IndicatorDef): string {
   if (def.kind === 'bb') return `BB(${def.period})`;
@@ -91,6 +130,7 @@ function indicatorLabel(def: IndicatorDef): string {
   return `${def.kind.toUpperCase()}(${def.period})`;
 }
 
+// ── analysis panel ───────────────────────────────────────────────────────
 const activePanel = ref<IndicatorDef | null>(null);
 const isAnalysisOpen = ref(false);
 function openAnalysis(def: IndicatorDef) {
@@ -99,307 +139,296 @@ function openAnalysis(def: IndicatorDef) {
 }
 const activePanelDto = computed(() => {
   if (!activePanel.value || !indicatorData.value) return null;
-  return indicatorData.value.find((d) => d.type === activePanel.value!.kind && (d.params.period ?? 0) === activePanel.value!.period) ?? null;
+  return findDto(indicatorData.value, activePanel.value.kind, activePanel.value.period);
 });
 
-// ── chart ─────────────────────────────────────────────────────────────────
-const chartContainer = ref<HTMLElement | null>(null);
-const chartWrapper = ref<HTMLElement | null>(null);
-let chart: IChartApi | null = null;
-let candleSeries: ISeriesApi<'Candlestick'> | null = null;
-let volumeSeries: ISeriesApi<'Histogram'> | null = null;
-const indicatorSeriesMap = new Map<string, AnySeries[]>();
+// ── defensive parsing: backend serializes numbers as strings ────────────
+function toNum(v: unknown): number {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') { const p = parseFloat(v); return Number.isFinite(p) ? p : NaN; }
+  return NaN;
+}
+function findDto(list: IndicatorSeriesDto[], kind: string, period: number): IndicatorSeriesDto | null {
+  return list.find((d) => d.type === kind && toNum((d.params as Record<string, unknown>).period ?? 0) === period) ?? null;
+}
+function seriesXY(points: IndicatorPointDto[], valueKey: string): [string, number | null][] {
+  return points.map((p) => {
+    const raw = (p.values as Record<string, unknown>)[valueKey];
+    const n = toNum(raw);
+    return [p.date, Number.isFinite(n) ? n : null];
+  });
+}
 
-const renderChart = () => {
-  if (!chartContainer.value) return;
+// ── ECharts option builder ───────────────────────────────────────────────
+const oscillatorDefs = computed(() => activeIndicators.value.filter((i) => OSCILLATOR_KINDS.includes(i.kind)));
+const overlayDefs = computed(() => activeIndicators.value.filter((i) => !OSCILLATOR_KINDS.includes(i.kind)));
 
-  if (chart) {
-    chart.remove();
-    chart = null;
-    indicatorSeriesMap.clear();
+interface Pane { top: string; height: string; }
+const panes = computed<Pane[]>(() => {
+  const oscCount = oscillatorDefs.value.length;
+  if (oscCount === 0) return [
+    { top: '4%', height: '76%' },
+    { top: '84%', height: '12%' }, // volume
+  ];
+  const totalOscHeight = Math.min(50, oscCount * 14);
+  const priceHeight = 88 - totalOscHeight - 14;
+  const oscHeightEach = totalOscHeight / oscCount;
+  const result: Pane[] = [
+    { top: '4%', height: `${priceHeight}%` },
+    { top: `${4 + priceHeight + 2}%`, height: '10%' },
+  ];
+  let cursor = 4 + priceHeight + 2 + 10 + 2;
+  for (let i = 0; i < oscCount; i++) {
+    result.push({ top: `${cursor}%`, height: `${oscHeightEach}%` });
+    cursor += oscHeightEach + 1;
   }
+  return result;
+});
 
-  chart = createChart(chartContainer.value, {
-    height: props.height || 360,
-    layout: {
-      background: { type: ColorType.Solid, color: '#111827' },
-      textColor: '#94A3B8'
-    },
-    grid: {
-      vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-      horzLines: { color: 'rgba(255, 255, 255, 0.05)' }
-    },
-    timeScale: {
-      borderColor: 'rgba(255, 255, 255, 0.1)',
-      timeVisible: true,
-      secondsVisible: false
-    },
-    rightPriceScale: {
-      borderColor: 'rgba(255, 255, 255, 0.1)'
-    }
-  });
-
-  candleSeries = chart.addCandlestickSeries({
-    upColor: '#00E599',
-    downColor: '#F43F5E',
-    borderVisible: false,
-    wickUpColor: '#00E599',
-    wickDownColor: '#F43F5E'
-  });
-
-  volumeSeries = chart.addHistogramSeries({
-    color: '#374151',
-    priceFormat: { type: 'volume' },
-    priceScaleId: ''
-  });
-  volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-
-  chart.subscribeCrosshairMove(handleCrosshairMove);
-
-  updateSeriesData();
-  renderIndicators();
-};
-
-const updateSeriesData = () => {
+const chartOption = computed<EChartsOption>(() => {
+  const p = palette.value;
   const bars = filteredBars.value;
-
-  const formattedCandles = bars.map((bar) => ({
-    time: bar.date,
-    open: parseFloat(bar.open),
-    high: parseFloat(bar.high),
-    low: parseFloat(bar.low),
-    close: parseFloat(bar.close)
+  const dates = bars.map((b) => b.date);
+  const candles = bars.map((b) => [toNum(b.open), toNum(b.close), toNum(b.low), toNum(b.high)]);
+  const volumes = bars.map((b, i) => ({
+    value: b.volume,
+    itemStyle: { color: toNum(b.close) >= toNum(b.open) ? 'rgba(0,229,153,0.35)' : 'rgba(244,63,94,0.35)' }
   }));
 
-  const formattedVolumes = bars.map((bar) => {
-    const isUp = parseFloat(bar.close) >= parseFloat(bar.open);
-    return {
-      time: bar.date,
-      value: bar.volume,
-      color: isUp ? 'rgba(0, 229, 153, 0.25)' : 'rgba(244, 63, 94, 0.25)'
-    };
-  });
+  const paneList = panes.value;
+  const grids = paneList.map((pane) => ({
+    left: 60,
+    right: 22,
+    top: pane.top,
+    height: pane.height,
+    borderColor: p.axisLine
+  }));
 
-  if (candleSeries && formattedCandles.length > 0)
-    candleSeries.setData(formattedCandles as unknown as Parameters<ISeriesApi<'Candlestick'>['setData']>[0]);
-  if (volumeSeries && formattedVolumes.length > 0)
-    volumeSeries.setData(formattedVolumes as unknown as Parameters<ISeriesApi<'Histogram'>['setData']>[0]);
+  const xAxes: EChartsOption['xAxis'] = paneList.map((_, idx) => ({
+    type: 'category' as const,
+    gridIndex: idx,
+    data: dates,
+    boundaryGap: true,
+    axisLine: { lineStyle: { color: p.axisLine } },
+    axisTick: { show: idx === paneList.length - 1 },
+    axisLabel: { show: idx === paneList.length - 1, color: p.text, fontSize: 10 },
+    splitLine: { show: false },
+    axisPointer: { z: 100, label: { show: idx === paneList.length - 1 } }
+  }));
 
-  chart?.timeScale().fitContent();
-};
+  const yAxes: EChartsOption['yAxis'] = paneList.map((_, idx) => ({
+    scale: true,
+    gridIndex: idx,
+    position: 'right' as const,
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { color: p.text, fontSize: 10, inside: false, margin: 8 },
+    splitLine: { lineStyle: { color: p.grid } },
+    splitNumber: idx === 0 ? 6 : 3
+  }));
 
-function removeIndicatorSeries(key: string) {
-  const seriesArr = indicatorSeriesMap.get(key);
-  if (!seriesArr) return;
-  seriesArr.forEach((s) => {
-    try { chart?.removeSeries(s); } catch { /* series already gone */ }
-  });
-  indicatorSeriesMap.delete(key);
-}
-
-function renderIndicators() {
-  if (!chart || !indicatorData.value) return;
-
-  for (const def of activeIndicators.value) {
-    const dto = indicatorData.value.find((d) => d.type === def.kind && (d.params.period ?? 0) === def.period);
-    removeIndicatorSeries(def.key);
-    if (!dto || dto.error || dto.points.length === 0) continue;
-
-    if (OSCILLATOR_KINDS.includes(def.kind) && def.kind !== 'macd') {
-      const s = chart.addLineSeries({
-        color: def.color,
-        lineWidth: 1,
-        priceScaleId: `${def.kind}-${def.key}`,
-        priceLineVisible: false,
-        lastValueVisible: false
-      });
-      s.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-
-      if (def.kind === 'adx') {
-        const plusDi = chart.addLineSeries({ color: '#34D399', lineWidth: 1, priceScaleId: `adx-${def.key}`, priceLineVisible: false, lastValueVisible: false });
-        const minusDi = chart.addLineSeries({ color: '#F87171', lineWidth: 1, priceScaleId: `adx-${def.key}`, priceLineVisible: false, lastValueVisible: false });
-        s.setData(dto.points.map((p) => ({ time: p.date, value: p.values.adx })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-        plusDi.setData(dto.points.map((p) => ({ time: p.date, value: p.values.plusDi })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-        minusDi.setData(dto.points.map((p) => ({ time: p.date, value: p.values.minusDi })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-        indicatorSeriesMap.set(def.key, [s, plusDi, minusDi]);
-      } else {
-        s.setData(dto.points.map((p) => ({ time: p.date, value: p.values.value })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-        indicatorSeriesMap.set(def.key, [s]);
+  const series: EChartsOption['series'] = [
+    {
+      name: 'Price',
+      type: 'candlestick',
+      xAxisIndex: 0,
+      yAxisIndex: 0,
+      data: candles,
+      itemStyle: {
+        color: p.up,
+        color0: p.down,
+        borderColor: p.up,
+        borderColor0: p.down
       }
-    } else if (def.kind === 'macd') {
-      const line = chart.addLineSeries({ color: def.color, lineWidth: 2, priceScaleId: `macd-${def.key}`, priceLineVisible: false, lastValueVisible: false });
-      const signal = chart.addLineSeries({ color: '#F87171', lineWidth: 1, priceScaleId: `macd-${def.key}`, priceLineVisible: false, lastValueVisible: false });
-      const hist = chart.addHistogramSeries({ priceScaleId: `macd-${def.key}`, priceLineVisible: false, lastValueVisible: false });
-      line.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-      line.setData(dto.points.map((p) => ({ time: p.date, value: p.values.line })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-      signal.setData(dto.points.map((p) => ({ time: p.date, value: p.values.signal })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-      hist.setData(
-        dto.points.map((p) => ({
-          time: p.date,
-          value: p.values.histogram ?? 0,
-          color: (p.values.histogram ?? 0) >= 0 ? 'rgba(0, 229, 153, 0.5)' : 'rgba(244, 63, 94, 0.5)'
-        })) as Parameters<ISeriesApi<'Histogram'>['setData']>[0]
-      );
-      indicatorSeriesMap.set(def.key, [line, signal, hist]);
-    } else if (def.kind === 'bb') {
-      const upper = chart.addLineSeries({ color: def.color, lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
-      const middle = chart.addLineSeries({ color: def.color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-      const lower = chart.addLineSeries({ color: def.color, lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
-      upper.setData(dto.points.map((p) => ({ time: p.date, value: p.values.upper })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-      middle.setData(dto.points.map((p) => ({ time: p.date, value: p.values.middle })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-      lower.setData(dto.points.map((p) => ({ time: p.date, value: p.values.lower })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-      indicatorSeriesMap.set(def.key, [upper, middle, lower]);
+    },
+    {
+      name: 'Volume',
+      type: 'bar',
+      xAxisIndex: 1,
+      yAxisIndex: 1,
+      data: volumes,
+      barMaxWidth: 12
+    }
+  ];
+
+  // Overlays on price pane
+  const dto = indicatorData.value ?? [];
+  for (const def of overlayDefs.value) {
+    const matched = findDto(dto, def.kind, def.period);
+    if (!matched || matched.error || matched.points.length === 0) continue;
+
+    if (def.kind === 'bb') {
+      series.push({
+        name: `${indicatorLabel(def)} upper`, type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+        showSymbol: false, smooth: false, lineStyle: { color: def.color, width: 1, type: 'dashed' },
+        data: seriesXY(matched.points, 'upper')
+      });
+      series.push({
+        name: `${indicatorLabel(def)} middle`, type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+        showSymbol: false, smooth: false, lineStyle: { color: def.color, width: 1 },
+        data: seriesXY(matched.points, 'middle')
+      });
+      series.push({
+        name: `${indicatorLabel(def)} lower`, type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+        showSymbol: false, smooth: false, lineStyle: { color: def.color, width: 1, type: 'dashed' },
+        data: seriesXY(matched.points, 'lower')
+      });
     } else {
-      const s = chart.addLineSeries({ color: def.color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
-      s.setData(dto.points.map((p) => ({ time: p.date, value: p.values.value })) as Parameters<ISeriesApi<'Line'>['setData']>[0]);
-      indicatorSeriesMap.set(def.key, [s]);
+      series.push({
+        name: indicatorLabel(def), type: 'line', xAxisIndex: 0, yAxisIndex: 0,
+        showSymbol: false, smooth: false, lineStyle: { color: def.color, width: 2 },
+        data: seriesXY(matched.points, 'value')
+      });
     }
   }
-}
 
-// ── crosshair tooltip ────────────────────────────────────────────────────
-interface CrosshairInfo {
-  x: number;
-  y: number;
-  date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: string;
-  indicatorRows: { label: string; value: string; color: string }[];
-}
-const crosshair = ref<CrosshairInfo | null>(null);
+  // Oscillators on their own panes
+  oscillatorDefs.value.forEach((def, i) => {
+    const paneIdx = 2 + i;
+    const matched = findDto(dto, def.kind, def.period);
+    if (!matched || matched.error || matched.points.length === 0) return;
 
-function formatTime(time: unknown): string {
-  if (typeof time === 'string') return time;
-  if (time && typeof time === 'object' && 'year' in (time as Record<string, unknown>)) {
-    const t = time as { year: number; month: number; day: number };
-    return `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
-  }
-  return String(time ?? '');
-}
-function formatVol(v: number): string {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
-  if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
-  if (v >= 1e3) return `${(v / 1e3).toFixed(2)}K`;
-  return String(v);
-}
+    if (def.kind === 'macd') {
+      series.push({
+        name: 'MACD line', type: 'line', xAxisIndex: paneIdx, yAxisIndex: paneIdx,
+        showSymbol: false, lineStyle: { color: def.color, width: 1.5 },
+        data: seriesXY(matched.points, 'line')
+      });
+      series.push({
+        name: 'Signal', type: 'line', xAxisIndex: paneIdx, yAxisIndex: paneIdx,
+        showSymbol: false, lineStyle: { color: '#F87171', width: 1 },
+        data: seriesXY(matched.points, 'signal')
+      });
+      series.push({
+        name: 'Histogram', type: 'bar', xAxisIndex: paneIdx, yAxisIndex: paneIdx,
+        data: matched.points.map((pt) => {
+          const h = toNum((pt.values as Record<string, unknown>).histogram);
+          return {
+            value: [pt.date, Number.isFinite(h) ? h : 0],
+            itemStyle: { color: h >= 0 ? 'rgba(0,229,153,0.5)' : 'rgba(244,63,94,0.5)' }
+          };
+        })
+      });
+    } else if (def.kind === 'adx') {
+      series.push({
+        name: 'ADX', type: 'line', xAxisIndex: paneIdx, yAxisIndex: paneIdx,
+        showSymbol: false, lineStyle: { color: def.color, width: 1.5 },
+        data: seriesXY(matched.points, 'adx')
+      });
+      series.push({
+        name: '+DI', type: 'line', xAxisIndex: paneIdx, yAxisIndex: paneIdx,
+        showSymbol: false, lineStyle: { color: '#34D399', width: 1 },
+        data: seriesXY(matched.points, 'plusDi')
+      });
+      series.push({
+        name: '-DI', type: 'line', xAxisIndex: paneIdx, yAxisIndex: paneIdx,
+        showSymbol: false, lineStyle: { color: '#F87171', width: 1 },
+        data: seriesXY(matched.points, 'minusDi')
+      });
+    } else {
+      series.push({
+        name: indicatorLabel(def), type: 'line', xAxisIndex: paneIdx, yAxisIndex: paneIdx,
+        showSymbol: false, lineStyle: { color: def.color, width: 1.5 },
+        data: seriesXY(matched.points, 'value')
+      });
+    }
+  });
 
-function handleCrosshairMove(param: MouseEventParams) {
-  if (!param.point || !param.time || !candleSeries) {
-    crosshair.value = null;
-    return;
-  }
-  const candle = param.seriesData.get(candleSeries) as { open: number; high: number; low: number; close: number } | undefined;
-  const vol = volumeSeries ? (param.seriesData.get(volumeSeries) as { value: number } | undefined) : undefined;
-  if (!candle) {
-    crosshair.value = null;
-    return;
-  }
-
-  const suffixesByKind: Record<string, string[]> = {
-    bb: ['U', 'M', 'L'],
-    adx: ['ADX', '+DI', '-DI'],
-    macd: ['Line', 'Signal', 'Hist']
+  return {
+    backgroundColor: p.bg,
+    animation: false,
+    grid: grids,
+    xAxis: xAxes,
+    yAxis: yAxes,
+    axisPointer: {
+      link: [{ xAxisIndex: 'all' as const }],
+      lineStyle: { color: p.text, opacity: 0.4 },
+      label: { backgroundColor: p.text, color: themeStore.mode === 'dark' ? '#0F172A' : '#F8FAFC' }
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: p.tooltipBg,
+      borderColor: p.tooltipBorder,
+      borderWidth: 1,
+      textStyle: { color: p.textStrong, fontSize: 11, fontFamily: 'ui-monospace, monospace' },
+      padding: [8, 12],
+      axisPointer: { type: 'cross' }
+    },
+    dataZoom: [
+      { type: 'inside', xAxisIndex: paneList.map((_, i) => i), start: 60, end: 100 }
+    ],
+    series
   };
-
-  const indicatorRows: { label: string; value: string; color: string }[] = [];
-  for (const def of activeIndicators.value) {
-    const seriesArr = indicatorSeriesMap.get(def.key);
-    if (!seriesArr) continue;
-    const suffixes = suffixesByKind[def.kind] ?? [''];
-    seriesArr.forEach((s, idx) => {
-      const point = param.seriesData.get(s) as { value: number } | undefined;
-      if (point && typeof point.value === 'number') {
-        indicatorRows.push({
-          label: `${indicatorLabel(def)}${suffixes[idx] ? ' ' + suffixes[idx] : ''}`,
-          value: point.value.toFixed(2),
-          color: def.color
-        });
-      }
-    });
-  }
-
-  crosshair.value = {
-    x: param.point.x,
-    y: param.point.y,
-    date: formatTime(param.time),
-    open: candle.open,
-    high: candle.high,
-    low: candle.low,
-    close: candle.close,
-    volume: vol ? formatVol(vol.value) : '—',
-    indicatorRows
-  };
-}
+});
 
 // ── fullscreen (mobile landscape) ───────────────────────────────────────
 const isFullscreen = ref(false);
+const chartWrapper = ref<HTMLElement | null>(null);
 
 async function toggleFullscreen() {
-  if (!chartWrapper.value) return;
-  if (!document.fullscreenElement) {
-    await chartWrapper.value.requestFullscreen?.();
-    try {
-      const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
-      await orientation.lock?.('landscape');
-    } catch { /* orientation lock unsupported (e.g. iOS Safari) — fullscreen still works */ }
-  } else {
-    await document.exitFullscreen();
-  }
-}
+  const el = chartWrapper.value;
+  if (!el) return;
+  const anyEl = el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+  const anyDoc = document as Document & {
+    webkitExitFullscreen?: () => Promise<void>;
+    webkitFullscreenElement?: Element | null;
+  };
 
-function onFullscreenChange() {
-  isFullscreen.value = Boolean(document.fullscreenElement);
-  if (!document.fullscreenElement) {
+  if (!document.fullscreenElement && !anyDoc.webkitFullscreenElement) {
     try {
-      const orientation = screen.orientation as ScreenOrientation & { unlock?: () => void };
-      orientation.unlock?.();
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (anyEl.webkitRequestFullscreen) await anyEl.webkitRequestFullscreen();
+      else { isFullscreen.value = true; return; } // CSS fallback for iOS Safari
+    } catch { isFullscreen.value = true; return; }
+    try {
+      const orient = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+      await orient.lock?.('landscape');
     } catch { /* ignore */ }
+  } else {
+    if (document.exitFullscreen) await document.exitFullscreen();
+    else if (anyDoc.webkitExitFullscreen) await anyDoc.webkitExitFullscreen();
+    isFullscreen.value = false;
   }
-  setTimeout(handleResize, 60);
+}
+function onFullscreenChange() {
+  const anyDoc = document as Document & { webkitFullscreenElement?: Element | null };
+  isFullscreen.value = Boolean(document.fullscreenElement || anyDoc.webkitFullscreenElement);
+  if (!isFullscreen.value) {
+    try { (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.(); } catch { /* ignore */ }
+  }
+  setTimeout(() => chartRef.value?.resize(), 80);
 }
 
-const handleResize = () => {
-  if (chart && chartContainer.value)
-    chart.applyOptions({ width: chartContainer.value.clientWidth, height: chartWrapper.value?.clientHeight || props.height || 360 });
-};
-
-watch(() => props.bars, () => renderChart(), { deep: true });
-watch(filteredBars, () => updateSeriesData());
-watch(indicatorData, () => renderIndicators());
-watch(
-  activeIndicators,
-  () => {
-    const activeKeys = new Set(activeIndicators.value.map((i) => i.key));
-    for (const key of [...indicatorSeriesMap.keys()]) {
-      if (!activeKeys.has(key)) removeIndicatorSeries(key);
-    }
-  },
-  { deep: true }
-);
+const chartRef = shallowRef<InstanceType<typeof VChart> | null>(null);
+const handleResize = () => chartRef.value?.resize();
 
 onMounted(() => {
-  renderChart();
   window.addEventListener('resize', handleResize);
   document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange as EventListener);
 });
-
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
   document.removeEventListener('fullscreenchange', onFullscreenChange);
-  if (chart) chart.remove();
+  document.removeEventListener('webkitfullscreenchange', onFullscreenChange as EventListener);
 });
+
+const chartHeight = computed(() => {
+  const base = props.height ?? 380;
+  const oscCount = oscillatorDefs.value.length;
+  return isFullscreen.value ? undefined : base + oscCount * 70;
+});
+
+watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
 </script>
 
 <template>
   <div
     ref="chartWrapper"
     class="w-full border border-white/10 rounded-3xl overflow-hidden sw-glass-card p-3 sm:p-4 shadow-lg select-none relative"
-    :class="isFullscreen ? 'bg-terminal-bg h-screen flex flex-col' : ''"
+    :class="isFullscreen ? 'bg-terminal-bg h-screen w-screen fixed inset-0 z-50 flex flex-col' : ''"
   >
-    <!-- Header row: label + latest stats + period selector + fullscreen -->
+    <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between px-1 pb-3 gap-2">
       <div class="flex items-center gap-3 flex-wrap">
         <span class="text-xs font-mono font-bold text-gray-400 uppercase tracking-widest">
@@ -419,17 +448,13 @@ onUnmounted(() => {
             ? 'bg-terminal-accent/20 border-terminal-accent/50 text-terminal-accent shadow-sm'
             : 'bg-transparent border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20'"
           @click="selectedPeriod = p"
-        >
-          {{ p }}
-        </button>
+        >{{ p }}</button>
         <button
           type="button"
           class="px-2.5 py-1 text-xs font-mono font-bold rounded-lg border border-white/10 bg-transparent text-gray-400 hover:text-terminal-accent hover:border-terminal-accent/40 transition-colors"
           :title="isFullscreen ? 'Exit full screen' : 'View in full screen'"
           @click="toggleFullscreen"
-        >
-          {{ isFullscreen ? '⤢ Exit' : '⤢ Full screen' }}
-        </button>
+        >{{ isFullscreen ? '✕ Exit' : '⤢ Full screen' }}</button>
       </div>
     </div>
 
@@ -448,17 +473,10 @@ onUnmounted(() => {
       <input
         v-if="!['macd', 'obv'].includes(newIndicatorKind)"
         v-model.number="newIndicatorPeriod"
-        type="number"
-        min="2"
-        max="500"
+        type="number" min="2" max="500"
         class="w-16 bg-terminal-bg border border-terminal-border rounded-lg px-2 py-1.5 text-[11px] font-mono text-gray-200 focus:outline-none focus:border-terminal-accent"
       />
-      <button
-        type="button"
-        class="px-2.5 py-1.5 text-[11px] font-mono font-bold rounded-lg border border-terminal-accent/40 text-terminal-accent hover:bg-terminal-accent/10 transition-colors"
-        @click="addFromDropdown"
-      >+ Add</button>
-
+      <button type="button" class="px-2.5 py-1.5 text-[11px] font-mono font-bold rounded-lg border border-terminal-accent/40 text-terminal-accent hover:bg-terminal-accent/10 transition-colors" @click="addFromDropdown">+ Add</button>
       <span class="text-[10px] text-gray-600 font-mono px-1">quick:</span>
       <button type="button" class="px-2 py-1 text-[10px] font-mono text-gray-400 hover:text-terminal-accent rounded-md border border-white/10 hover:border-terminal-accent/40 transition-colors" @click="addIndicator('sma', 20)">SMA20</button>
       <button type="button" class="px-2 py-1 text-[10px] font-mono text-gray-400 hover:text-terminal-accent rounded-md border border-white/10 hover:border-terminal-accent/40 transition-colors" @click="addIndicator('sma', 50)">SMA50</button>
@@ -480,32 +498,12 @@ onUnmounted(() => {
     </div>
 
     <div :class="isFullscreen ? 'flex-1 relative' : 'relative'">
-      <div ref="chartContainer" class="w-full" :style="isFullscreen ? {} : { height: `${height || 360}px` }" />
-
-      <!-- Crosshair tooltip -->
-      <div
-        v-if="crosshair"
-        class="absolute z-10 pointer-events-none px-3 py-2 rounded-xl border border-white/15 bg-terminal-bg/95 backdrop-blur-sm shadow-xl text-[11px] font-mono space-y-1 min-w-[150px]"
-        :style="{
-          left: `${Math.min(crosshair.x + 14, (chartContainer?.clientWidth || 400) - 170)}px`,
-          top: `${Math.max(crosshair.y - 10, 8)}px`
-        }"
-      >
-        <div class="text-gray-400">{{ crosshair.date }}</div>
-        <div class="grid grid-cols-2 gap-x-3 text-gray-300">
-          <span>O <span class="text-gray-100">{{ crosshair.open.toFixed(2) }}</span></span>
-          <span>H <span class="text-terminal-accent">{{ crosshair.high.toFixed(2) }}</span></span>
-          <span>L <span class="text-rose-400">{{ crosshair.low.toFixed(2) }}</span></span>
-          <span>C <span class="text-gray-100 font-bold">{{ crosshair.close.toFixed(2) }}</span></span>
-        </div>
-        <div class="text-gray-500">Vol {{ crosshair.volume }}</div>
-        <div v-if="crosshair.indicatorRows.length" class="pt-1 border-t border-white/10 space-y-0.5">
-          <div v-for="row in crosshair.indicatorRows" :key="row.label" class="flex items-center justify-between gap-3">
-            <span :style="{ color: row.color }">{{ row.label }}</span>
-            <span class="text-gray-200">{{ row.value }}</span>
-          </div>
-        </div>
-      </div>
+      <VChart
+        ref="chartRef"
+        :option="chartOption"
+        :autoresize="true"
+        :style="isFullscreen ? { width: '100%', height: '100%' } : { width: '100%', height: `${chartHeight}px` }"
+      />
     </div>
 
     <IndicatorAnalysisPanel
