@@ -1,0 +1,301 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Sidwell v3 — iOS 26 Liquid Glass Design System
+   dark  = iOS 26 Obsidian Aurora (pure black + aurora glows + liquid glass)
+   light = iOS 26 Frosted Pearl  (F2F2F7 background + frosted white glass)
+══════════════════════════════════════════════════════════════════════════ */
+
+/* ── iOS 26 Dark "Obsidian Aurora" (default + legacy ios26 alias) ─────── */
+:root,
+[data-theme="dark"],
+[data-theme="ios26"] {
+  --bg-primary: #000000;
+  --bg-secondary: rgba(28, 28, 30, 0.72);
+  --bg-tertiary: rgba(44, 44, 46, 0.80);
+  --bg-glass-start: rgba(255, 255, 255, 0.10);
+  --bg-glass-end: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.20);
+  --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --shadow-glow-accent: 0 0 28px -4px rgba(10, 132, 255, 0.40);
+
+  --color-terminal-bg: #000000;
+  --color-terminal-surface: rgba(28, 28, 30, 0.72);
+  --color-terminal-surface-light: rgba(44, 44, 46, 0.80);
+  --color-terminal-border: rgba(255, 255, 255, 0.12);
+  --color-terminal-accent: #0A84FF;
+  --color-terminal-up: #30D158;
+  --color-terminal-down: #FF453A;
+  --color-text-main: #FFFFFF;
+  --color-text-sub: rgba(235, 235, 245, 0.55);
+}
+
+body,
+[data-theme="dark"] body,
+[data-theme="ios26"] body {
+  background-color: #000000;
+  background-image:
+    radial-gradient(ellipse 80% 55% at 8% 5%,  rgba(88, 28, 218, 0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 50% at 94% 6%,  rgba(20, 184, 166, 0.17) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 50% 108%, rgba(10, 132, 255, 0.14) 0%, transparent 58%);
+  background-attachment: fixed;
+  color: #FFFFFF;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
+}
+
+/* ── iOS 26 Light "Frosted Pearl" ─────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-primary: #F2F2F7;
+  --bg-secondary: rgba(255, 255, 255, 0.80);
+  --bg-tertiary: rgba(255, 255, 255, 0.96);
+  --bg-glass-start: rgba(255, 255, 255, 0.88);
+  --bg-glass-end: rgba(255, 255, 255, 0.68);
+  --border: rgba(60, 60, 67, 0.18);
+  --glass-border: rgba(60, 60, 67, 0.12);
+  --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 1);
+  --shadow-glow-accent: 0 0 20px -4px rgba(0, 122, 255, 0.22);
+
+  --color-terminal-bg: #F2F2F7;
+  --color-terminal-surface: rgba(255, 255, 255, 0.80);
+  --color-terminal-surface-light: rgba(255, 255, 255, 0.96);
+  --color-terminal-border: rgba(60, 60, 67, 0.18);
+  --color-terminal-accent: #007AFF;
+  --color-terminal-up: #34C759;
+  --color-terminal-down: #FF3B30;
+  --color-text-main: #1C1C1E;
+  --color-text-sub: #8E8E93;
+}
+
+[data-theme="light"] body {
+  background-color: #F2F2F7;
+  background-image: none;
+  color: #1C1C1E;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.011em;
+}
+
+/* ── Liquid Glass Surfaces ────────────────────────────────────────────── */
+.bg-terminal-surface,
+.bg-terminal-surface\/95,
+.bg-terminal-surface\/90,
+.bg-terminal-surface\/80,
+.bg-terminal-surface\/70,
+.bg-terminal-surface\/60,
+.bg-terminal-surface\/50,
+.bg-terminal-surface\/40,
+.bg-terminal-bg\/90,
+.bg-terminal-bg\/80,
+.bg-terminal-bg\/70,
+.bg-terminal-bg\/60,
+.bg-terminal-bg\/50,
+.bg-terminal-bg\/40,
+.sw-glass-card {
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Dark Hover Effects ───────────────────────────────────────────────── */
+.bg-terminal-surface:hover,
+.bg-terminal-bg\/80:hover {
+  border-color: rgba(10, 132, 255, 0.45) !important;
+}
+
+/* ── sw-glass-card ────────────────────────────────────────────────────── */
+.sw-glass-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  box-shadow: var(--glass-shadow);
+  border-radius: 22px;
+  transition: transform 0.22s cubic-bezier(0.25, 1, 0.5, 1),
+              box-shadow 0.22s ease,
+              border-color 0.22s ease;
+}
+
+/* ── Light Mode Surface Overrides ─────────────────────────────────────── */
+[data-theme="light"] .bg-terminal-surface,
+[data-theme="light"] .bg-terminal-surface\/95,
+[data-theme="light"] .bg-terminal-surface\/90,
+[data-theme="light"] .bg-terminal-surface\/80,
+[data-theme="light"] .bg-terminal-surface\/70,
+[data-theme="light"] .bg-terminal-surface\/60,
+[data-theme="light"] .bg-terminal-surface\/50,
+[data-theme="light"] .bg-terminal-surface\/40,
+[data-theme="light"] .sw-glass-card {
+  background-color: rgba(255, 255, 255, 0.80) !important;
+  border-color: rgba(60, 60, 67, 0.18) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+[data-theme="light"] .bg-terminal-surface:hover,
+[data-theme="light"] .bg-terminal-bg\/80:hover {
+  border-color: rgba(0, 122, 255, 0.35) !important;
+}
+
+[data-theme="light"] .bg-terminal-bg,
+[data-theme="light"] .bg-terminal-bg\/90,
+[data-theme="light"] .bg-terminal-bg\/80,
+[data-theme="light"] .bg-terminal-bg\/70,
+[data-theme="light"] .bg-terminal-bg\/60,
+[data-theme="light"] .bg-terminal-bg\/50,
+[data-theme="light"] .bg-terminal-bg\/40 {
+  background-color: #F2F2F7 !important;
+  backdrop-filter: none;
+}
+
+[data-theme="light"] .bg-terminal-surface-light,
+[data-theme="light"] .bg-terminal-surface-light\/60 {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+/* ── Light Mode Text ──────────────────────────────────────────────────── */
+[data-theme="light"] .text-gray-100,
+[data-theme="light"] .text-gray-200,
+[data-theme="light"] .text-white { color: #1C1C1E !important; }
+
+[data-theme="light"] .text-gray-300,
+[data-theme="light"] .text-gray-400 { color: #3C3C43 !important; }
+
+[data-theme="light"] .text-gray-500,
+[data-theme="light"] .text-gray-600 { color: #8E8E93 !important; }
+
+[data-theme="light"] .text-terminal-accent { color: #007AFF !important; }
+[data-theme="light"] .text-terminal-up { color: #248A3D !important; }
+[data-theme="light"] .text-terminal-down { color: #D70015 !important; }
+[data-theme="light"] .text-emerald-300,
+[data-theme="light"] .text-emerald-400 { color: #248A3D !important; }
+[data-theme="light"] .text-rose-300,
+[data-theme="light"] .text-rose-400 { color: #D70015 !important; }
+[data-theme="light"] .text-amber-300,
+[data-theme="light"] .text-amber-400 { color: #B25000 !important; }
+[data-theme="light"] .text-sky-300,
+[data-theme="light"] .text-sky-400 { color: #007AFF !important; }
+[data-theme="light"] .text-blue-300,
+[data-theme="light"] .text-blue-400 { color: #0040DD !important; }
+[data-theme="light"] .text-purple-300,
+[data-theme="light"] .text-purple-400 { color: #7B2FBE !important; }
+[data-theme="light"] .text-orange-300,
+[data-theme="light"] .text-orange-400 { color: #C25000 !important; }
+
+/* ── Light Mode Borders ───────────────────────────────────────────────── */
+[data-theme="light"] .border-terminal-border,
+[data-theme="light"] .border-terminal-border\/80,
+[data-theme="light"] .border-terminal-border\/60,
+[data-theme="light"] .border-terminal-border\/50,
+[data-theme="light"] .border-terminal-border\/40,
+[data-theme="light"] .border-white\/10,
+[data-theme="light"] .border-white\/15,
+[data-theme="light"] .border-white\/20 { border-color: rgba(60, 60, 67, 0.18) !important; }
+
+/* ── Light Mode Inputs ────────────────────────────────────────────────── */
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select,
+[data-theme="light"] option {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  color: #1C1C1E !important;
+  border-color: rgba(60, 60, 67, 0.20) !important;
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus,
+[data-theme="light"] select:focus {
+  border-color: #007AFF !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.18) !important;
+}
+
+/* ── Light Mode Colored Cards ─────────────────────────────────────────── */
+[data-theme="light"] .bg-blue-950\/10,
+[data-theme="light"] .bg-blue-950\/15,
+[data-theme="light"] .bg-blue-950\/20,
+[data-theme="light"] .bg-blue-950\/25,
+[data-theme="light"] .bg-blue-950\/30 { background-color: #EFF6FF !important; border-color: #93C5FD !important; }
+[data-theme="light"] .bg-purple-950\/10,
+[data-theme="light"] .bg-purple-950\/15,
+[data-theme="light"] .bg-purple-950\/20,
+[data-theme="light"] .bg-purple-950\/25 { background-color: #F3E8FF !important; border-color: #C4B5FD !important; }
+[data-theme="light"] .bg-emerald-950\/10,
+[data-theme="light"] .bg-emerald-950\/15,
+[data-theme="light"] .bg-emerald-950\/20,
+[data-theme="light"] .bg-emerald-950\/25,
+[data-theme="light"] .bg-emerald-950\/30 { background-color: #F0FDF4 !important; border-color: #86EFAC !important; }
+[data-theme="light"] .bg-amber-950\/10,
+[data-theme="light"] .bg-amber-950\/15,
+[data-theme="light"] .bg-amber-950\/20,
+[data-theme="light"] .bg-amber-950\/25 { background-color: #FFFBEB !important; border-color: #FCD34D !important; }
+[data-theme="light"] .bg-sky-950\/15,
+[data-theme="light"] .bg-sky-950\/20,
+[data-theme="light"] .bg-sky-950\/25 { background-color: #F0F9FF !important; border-color: #7DD3FC !important; }
+
+/* Pastel text (200 shades) on light needs to become dark ink to remain legible on white cards. */
+[data-theme="light"] .text-blue-100,
+[data-theme="light"] .text-blue-200 { color: #1E3A8A !important; }
+[data-theme="light"] .text-emerald-100,
+[data-theme="light"] .text-emerald-200 { color: #065F46 !important; }
+[data-theme="light"] .text-amber-100,
+[data-theme="light"] .text-amber-200 { color: #92400E !important; }
+[data-theme="light"] .text-rose-100,
+[data-theme="light"] .text-rose-200 { color: #9F1239 !important; }
+[data-theme="light"] .text-sky-100,
+[data-theme="light"] .text-sky-200 { color: #0369A1 !important; }
+[data-theme="light"] .text-purple-100,
+[data-theme="light"] .text-purple-200 { color: #5B21B6 !important; }
+
+/* Bright colored badge backgrounds (500/25 chips inside Avere headers) look washed out on white.
+   Tighten to solid pastel with matching border. */
+[data-theme="light"] .bg-blue-500\/15,
+[data-theme="light"] .bg-blue-500\/25 { background-color: #DBEAFE !important; }
+[data-theme="light"] .bg-emerald-500\/15,
+[data-theme="light"] .bg-emerald-500\/25 { background-color: #D1FAE5 !important; }
+[data-theme="light"] .bg-amber-500\/15,
+[data-theme="light"] .bg-amber-500\/25 { background-color: #FEF3C7 !important; }
+[data-theme="light"] .border-blue-500\/30,
+[data-theme="light"] .border-blue-500\/40,
+[data-theme="light"] .border-blue-400\/50 { border-color: #60A5FA !important; }
+[data-theme="light"] .border-emerald-500\/30,
+[data-theme="light"] .border-emerald-500\/40,
+[data-theme="light"] .border-emerald-400\/50 { border-color: #34D399 !important; }
+[data-theme="light"] .border-amber-500\/30,
+[data-theme="light"] .border-amber-500\/40 { border-color: #FBBF24 !important; }
+
+/* ── Light Mode Buttons / Accent ──────────────────────────────────────── */
+[data-theme="light"] button {
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* ── Button press scale for all themes ───────────────────────────────── */
+button:active {
+  transform: scale(0.97);
+}
+
+/* ── Privacy / Preseting Mode ─────────────────────────────────────────── */
+.sw-private {
+  display: inline-block;
+  border-radius: 4px;
+  transition: filter 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-private] .sw-private {
+  filter: blur(10px);
+  opacity: 0.65;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-terminal-accent); }
+
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.10); }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #007AFF; }
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
