@@ -15,28 +15,24 @@ const downloadingFormat = ref<ReportFormat | null>(null);
 const latestNote = computed(() =>
   (notes.value ?? []).slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0] ?? null
 );
-const disabled = computed(() => latestNote.value === null);
-const disabledReason = computed(() =>
-  disabled.value ? 'Adaugă o notă înainte de a descărca raportul.' : ''
-);
 
 async function download(format: ReportFormat) {
-  const note = latestNote.value;
-  if (!note || downloadingFormat.value) return;
+  if (downloadingFormat.value) return;
   downloadingFormat.value = format;
   try {
-    const { blob, fileName } = await api.postBlob(
-      `/tickers/${encodeURIComponent(props.symbol)}/notes/${note.id}/report`,
-      { format, includeAttachments: true }
-    );
-    const url = URL.createObjectURL(blob);
+    const note = latestNote.value;
+    const url = note
+      ? `/tickers/${encodeURIComponent(props.symbol)}/notes/${note.id}/report`
+      : `/tickers/${encodeURIComponent(props.symbol)}/report`;
+    const { blob, fileName } = await api.postBlob(url, { format, includeAttachments: true });
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
+    link.href = blobUrl;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
     toast.success('Raport descărcat', fileName);
   } catch {
     toast.error('Eroare', 'Nu s-a putut genera raportul.');
@@ -50,8 +46,7 @@ async function download(format: ReportFormat) {
   <div class="grid grid-cols-2 gap-2 w-full">
     <button
       type="button"
-      :disabled="disabled || downloadingFormat !== null"
-      :title="disabledReason"
+      :disabled="downloadingFormat !== null"
       class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 sw-glass-card text-sm font-mono font-bold text-gray-200 hover:border-terminal-accent/50 hover:text-terminal-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-200 shadow-sm active:scale-[0.98]"
       @click="download('pdf')"
     >
@@ -61,8 +56,7 @@ async function download(format: ReportFormat) {
 
     <button
       type="button"
-      :disabled="disabled || downloadingFormat !== null"
-      :title="disabledReason"
+      :disabled="downloadingFormat !== null"
       class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 sw-glass-card text-sm font-mono font-bold text-gray-200 hover:border-terminal-accent/50 hover:text-terminal-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-200 shadow-sm active:scale-[0.98]"
       @click="download('xlsx')"
     >

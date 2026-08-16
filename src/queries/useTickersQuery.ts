@@ -35,20 +35,14 @@ function mapTechnicalVerdict(raw: TechnicalVerdictDto): TickerVerdictDto {
     caution: 'yellow',
     avoid: 'red'
   };
-  const target = raw.reentry ? `$${raw.reentry.targetPrice.toFixed(2)}` : null;
-  const days = raw.reentry?.estimatedDays;
-  const sampleCount = raw.reentry?.sampleCount;
-
+  // Top-level card = short, business-facing verdict.
+  // Per-indicator trading suggestions ("hold them boy", "sell and wait to $X", CFD entry) live in the IndicatorAnalysisPanel modals.
   const summaryByAction: Record<TechnicalVerdictDto['action'], string> = {
-    strong_buy: `${magnitudeConviction}% conviction long: ${agreementPct}% of active signals point up strongly. Hold them — or open a long position (CFDs) if you're not in yet.`,
-    buy: `${magnitudeConviction}% conviction long: ${agreementPct}% of active signals lean bullish. Reasonable to add on strength or hold.`,
-    hold: `Signals are mixed — no clear edge either way (${magnitudeConviction}% conviction). Hold them boy: don't chase, don't dump.`,
-    caution: target
-      ? `${magnitudeConviction}% conviction short: ${agreementPct}% of signals lean bearish. Consider trimming and waiting to re-enter near ${target} (historical revert took ~${days} sessions across ${sampleCount} similar episodes).`
-      : `${magnitudeConviction}% conviction short: ${agreementPct}% of signals lean bearish (${magnitudeConviction}% conviction). Consider trimming and waiting for a better entry.`,
-    avoid: target
-      ? `${magnitudeConviction}% conviction short: strong bearish agreement (${agreementPct}%). Sell and wait to re-enter near ${target} — or open a short (CFDs) if that's your play. Historical mean-revert: ~${days} sessions across ${sampleCount} episodes.`
-      : `${magnitudeConviction}% conviction short: strong bearish agreement (${agreementPct}%). Sell and wait for a better entry — or open a short (CFDs) if that's your play.`
+    strong_buy: `Strongly bullish read: ${agreementPct}% of active signals agree. Worth buying.`,
+    buy: `Bullish tilt: ${agreementPct}% of active signals lean up. Reasonable entry.`,
+    hold: `Mixed signals — no clear edge either way. Hold if you own it, wait if you don't.`,
+    caution: `Bearish tilt: ${agreementPct}% of active signals lean down. Elevated risk — see per-indicator advice for entry timing.`,
+    avoid: `Strongly bearish read: ${agreementPct}% of active signals agree. Avoid — see per-indicator advice for entry timing.`
   };
 
   const reentry = raw.reentry

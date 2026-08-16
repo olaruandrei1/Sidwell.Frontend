@@ -261,9 +261,9 @@ const rangePercent = computed(() => {
     <div class="select-none space-y-5">
 
       <!-- Identity + actions -->
-      <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="flex items-center gap-3 flex-wrap">
+      <div class="flex flex-col items-center sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div class="min-w-0 w-full sm:w-auto flex flex-col items-center sm:items-start">
+          <div class="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
             <h1 class="text-3xl sm:text-4xl font-black text-gray-50 tracking-tight font-mono leading-none">{{ detail?.ticker.symbol || symbol }}</h1>
             <span class="px-2 py-1 text-xs bg-terminal-bg border border-white/10 rounded-lg font-bold text-gray-300 font-mono">{{ detail?.ticker.exchange || '?' }}</span>
             <span
@@ -272,7 +272,7 @@ const rangePercent = computed(() => {
             >{{ detail?.ticker.currency || '—' }}</span>
             <span v-if="detail?.watchlisted" class="px-2 py-1 text-xs bg-terminal-accent/10 border border-terminal-accent/30 rounded-lg font-bold text-terminal-accent font-mono">★ WATCHLIST</span>
           </div>
-          <p class="text-sm text-gray-400 font-sans mt-2">{{ detail?.ticker.name || 'Loading...' }}</p>
+          <p class="text-sm text-gray-400 font-sans mt-2 text-center sm:text-left">{{ detail?.ticker.name || 'Loading...' }}</p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <TagBadge v-if="detail?.composite?.overridden" variant="down" size="sm" pulse>BENEISH VETO</TagBadge>
@@ -354,6 +354,11 @@ const rangePercent = computed(() => {
               <span><span class="text-gray-600">HIGH</span> {{ formatStat(detail.keyStats.fiftyTwoWeekHigh, '', 2) }}</span>
             </div>
           </div>
+        </div>
+
+        <!-- Chart in between price and composite on desktop only -->
+        <div class="hidden lg:block flex-1 min-w-0 max-w-2xl">
+          <PriceChart :bars="detail?.price.history || []" :height="320" :symbol="symbol" :currency="detail?.ticker.currency || 'USD'" />
         </div>
 
         <!-- Composite Gauge (de-carded) -->
@@ -521,13 +526,13 @@ const rangePercent = computed(() => {
 
     <!-- ── Chart + Algorithms (Fluid Flexbox layout) ───────────────────────── -->
     <div v-if="!loadingDetail" class="flex flex-wrap w-full gap-6 items-start">
-      <!-- Price Chart -->
-      <div class="flex-1 min-w-[340px] max-w-full w-full">
-        <PriceChart :bars="detail?.price.history || []" :height="360" :symbol="symbol" />
+      <!-- Price Chart (mobile only — desktop shows chart between price and composite above) -->
+      <div class="flex-1 min-w-[340px] max-w-full w-full lg:hidden">
+        <PriceChart :bars="detail?.price.history || []" :height="360" :symbol="symbol" :currency="detail?.ticker.currency || 'USD'" />
       </div>
 
       <!-- Algorithms — title on background, score-bar cards (tap for detail) -->
-      <div v-if="scoredAlgos.length > 0" class="w-full xl:w-[540px] shrink-0 space-y-2.5">
+      <div v-if="scoredAlgos.length > 0" class="w-full lg:flex-1 space-y-2.5">
         <div class="flex items-center justify-between px-1">
           <h2 class="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono">
             Quantitative Algorithms
@@ -535,7 +540,7 @@ const rangePercent = computed(() => {
           <span class="text-[11px] text-gray-500 font-bold font-mono">{{ scoredAlgos.length }} MODELS · tap</span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
           <button
             v-for="algo in scoredAlgos"
             :key="algo.name"

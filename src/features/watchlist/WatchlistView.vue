@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { X } from '@lucide/vue';
+import { Trash2, RefreshCw, Plus } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import {
   useWatchlistQuery,
   useAddToWatchlistMutation,
   useRemoveFromWatchlistMutation
 } from '../../queries/useWatchlistQuery';
+import { api } from '../../shared/api/client';
 import { useToast } from '../../shared/composables/useToast';
 import PageHeader from '../../shared/ui/templates/PageHeader.vue';
 import DataTable, { type ColumnDef } from '../../shared/ui/molecules/DataTable.vue';
@@ -41,7 +42,7 @@ const columns = computed<ColumnDef<WatchlistRow>[]>(() => [
   { key: 'dayChangePct', label: t('watchlist.dayChange'), align: 'right' },
   { key: 'composite', label: t('watchlist.composite'), align: 'center' },
   { key: 'status', label: t('watchlist.status'), align: 'center' },
-  { key: 'actions', label: '', align: 'right' }
+  { key: 'actions', label: '', align: 'right', hideOnMobile: true }
 ]);
 
 const handleRowClick = (item: WatchlistRow) => {
@@ -69,6 +70,20 @@ const handleRemove = async (e: Event, symbol: string) => {
     toast.error('Remove Failed', e instanceof Error ? e.message : 'Error removing symbol');
   }
 };
+
+const syncingSymbol = ref<string | null>(null);
+async function handleSync(e: Event, symbol: string) {
+  e.stopPropagation();
+  syncingSymbol.value = symbol;
+  try {
+    await api.post(`/tickers/${encodeURIComponent(symbol)}/sync`, {});
+    toast.success('Sync queued', `${symbol}`);
+  } catch (err: unknown) {
+    toast.error('Sync failed', err instanceof Error ? err.message : 'Error');
+  } finally {
+    syncingSymbol.value = null;
+  }
+}
 </script>
 
 <template>
@@ -187,21 +202,55 @@ const handleRemove = async (e: Event, symbol: string) => {
       </template>
 
       <template #cell-actions="{ row }">
-        <div class="flex items-center justify-end gap-2 flex-shrink-0">
+        <div class="flex items-center justify-end gap-1.5">
           <button
             @click.stop="openAddTx(row.ticker.symbol)"
-            class="px-3.5 py-2 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all duration-200 text-sm font-mono font-bold btn-press shadow-sm whitespace-nowrap"
+            class="opacity-0 group-hover:opacity-100 p-2 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-all duration-150"
             title="Add to Portfolio"
           >
-            <span class="hidden sm:inline">+ Portfolio</span>
-            <span class="inline sm:hidden">+</span>
+            <Plus :size="15" />
+          </button>
+          <button
+            @click="(e) => handleSync(e, row.ticker.symbol)"
+            :disabled="syncingSymbol === row.ticker.symbol"
+            class="opacity-0 group-hover:opacity-100 p-2 rounded-lg text-gray-400 hover:text-terminal-accent hover:bg-terminal-accent/10 transition-all duration-150"
+            title="Sync"
+          >
+            <RefreshCw :size="15" :class="syncingSymbol === row.ticker.symbol ? 'animate-spin' : ''" />
           </button>
           <button
             @click="(e) => handleRemove(e, row.ticker.symbol)"
-            class="px-3.5 py-2 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 border border-white/10 transition-all duration-200 text-sm font-mono font-bold whitespace-nowrap flex-shrink-0"
+            class="opacity-0 group-hover:opacity-100 p-2 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-150"
             title="Remove from Watchlist"
           >
-            <span class="flex items-center gap-1.5"><X :size="16" /> <span class="hidden sm:inline">Remove</span></span>
+            <Trash2 :size="15" />
+          </button>
+        </div>
+      </template>
+
+      <template #mobile-footer="{ row }">
+        <div class="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            @click.stop="openAddTx(row.ticker.symbol)"
+            class="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/10 active:scale-95 transition-all"
+          >
+            <Plus :size="13" /><span>Portfolio</span>
+          </button>
+          <button
+            type="button"
+            @click.stop="handleSync($event, row.ticker.symbol)"
+            :disabled="syncingSymbol === row.ticker.symbol"
+            class="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium text-gray-400 border border-white/10 hover:text-terminal-accent hover:border-terminal-accent/30 active:scale-95 transition-all"
+          >
+            <RefreshCw :size="13" :class="syncingSymbol === row.ticker.symbol ? 'animate-spin' : ''" /><span>Sync</span>
+          </button>
+          <button
+            type="button"
+            @click.stop="handleRemove($event, row.ticker.symbol)"
+            class="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium text-rose-400 border border-rose-500/25 hover:bg-rose-500/10 active:scale-95 transition-all"
+          >
+            <Trash2 :size="13" /><span>Remove</span>
           </button>
         </div>
       </template>

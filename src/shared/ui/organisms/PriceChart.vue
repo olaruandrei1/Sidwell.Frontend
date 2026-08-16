@@ -33,11 +33,31 @@ use([
   MarkLineComponent
 ]);
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   bars: PriceBar[];
   height?: number;
   symbol: string;
-}>();
+  currency?: string;
+}>(), { currency: 'USD' });
+
+const currencySymbol = computed(() => {
+  switch ((props.currency || '').toUpperCase()) {
+    case 'USD': return '$';
+    case 'EUR': return '€';
+    case 'GBP': return '£';
+    case 'JPY': return '¥';
+    case 'RON': return 'RON';
+    default: return props.currency ?? '';
+  }
+});
+
+const priceLabel = computed(() => {
+  const now = new Date();
+  const day = now.getUTCDay();
+  const hour = now.getUTCHours();
+  const marketOpen = day >= 1 && day <= 5 && hour >= 13 && hour < 20;
+  return marketOpen ? 'Current price' : 'Last price';
+});
 
 const themeStore = useThemeStore();
 provide(THEME_KEY, computed(() => (themeStore.mode === 'dark' ? 'dark' : 'default')));
@@ -168,18 +188,12 @@ const overlayDefs = computed(() => activeIndicators.value.filter((i) => !OSCILLA
 interface Pane { top: string; height: string; }
 const panes = computed<Pane[]>(() => {
   const oscCount = oscillatorDefs.value.length;
-  if (oscCount === 0) return [
-    { top: '4%', height: '76%' },
-    { top: '84%', height: '12%' }, // volume
-  ];
-  const totalOscHeight = Math.min(50, oscCount * 14);
-  const priceHeight = 88 - totalOscHeight - 14;
+  if (oscCount === 0) return [{ top: '2%', height: '94%' }];
+  const totalOscHeight = Math.min(50, oscCount * 16);
+  const priceHeight = 96 - totalOscHeight - 4;
   const oscHeightEach = totalOscHeight / oscCount;
-  const result: Pane[] = [
-    { top: '4%', height: `${priceHeight}%` },
-    { top: `${4 + priceHeight + 2}%`, height: '10%' },
-  ];
-  let cursor = 4 + priceHeight + 2 + 10 + 2;
+  const result: Pane[] = [{ top: '2%', height: `${priceHeight}%` }];
+  let cursor = 2 + priceHeight + 3;
   for (let i = 0; i < oscCount; i++) {
     result.push({ top: `${cursor}%`, height: `${oscHeightEach}%` });
     cursor += oscHeightEach + 1;
@@ -192,18 +206,15 @@ const chartOption = computed<EChartsOption>(() => {
   const bars = filteredBars.value;
   const dates = bars.map((b) => b.date);
   const candles = bars.map((b) => [toNum(b.open), toNum(b.close), toNum(b.low), toNum(b.high)]);
-  const volumes = bars.map((b, i) => ({
-    value: b.volume,
-    itemStyle: { color: toNum(b.close) >= toNum(b.open) ? 'rgba(0,229,153,0.35)' : 'rgba(244,63,94,0.35)' }
-  }));
 
   const paneList = panes.value;
   const grids = paneList.map((pane) => ({
-    left: 60,
-    right: 22,
+    left: 8,
+    right: 52,
     top: pane.top,
     height: pane.height,
-    borderColor: p.axisLine
+    borderColor: p.axisLine,
+    containLabel: false
   }));
 
   const xAxes: EChartsOption['xAxis'] = paneList.map((_, idx) => ({
@@ -224,7 +235,7 @@ const chartOption = computed<EChartsOption>(() => {
     position: 'right' as const,
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: { color: p.text, fontSize: 10, inside: false, margin: 8 },
+    axisLabel: { color: p.text, fontSize: 10, inside: false, margin: 6 },
     splitLine: { lineStyle: { color: p.grid } },
     splitNumber: idx === 0 ? 6 : 3
   }));
@@ -242,14 +253,6 @@ const chartOption = computed<EChartsOption>(() => {
         borderColor: p.up,
         borderColor0: p.down
       }
-    },
-    {
-      name: 'Volume',
-      type: 'bar',
-      xAxisIndex: 1,
-      yAxisIndex: 1,
-      data: volumes,
-      barMaxWidth: 12
     }
   ];
 
@@ -286,7 +289,7 @@ const chartOption = computed<EChartsOption>(() => {
 
   // Oscillators on their own panes
   oscillatorDefs.value.forEach((def, i) => {
-    const paneIdx = 2 + i;
+    const paneIdx = 1 + i;
     const matched = findDto(dto, def.kind, def.period);
     if (!matched || matched.error || matched.points.length === 0) return;
 
@@ -430,72 +433,62 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
     class="w-full border border-white/10 rounded-3xl overflow-hidden sw-glass-card p-3 sm:p-4 shadow-lg select-none relative"
     :class="isFullscreen ? 'bg-terminal-bg h-screen w-screen fixed inset-0 z-50 flex flex-col' : ''"
   >
-    <!-- Header -->
-    <div class="flex flex-col gap-2.5 px-1 pb-3">
-      <div class="flex items-baseline justify-between gap-3 flex-wrap">
-        <div>
-          <div class="text-[11px] font-mono font-bold text-gray-400 uppercase tracking-wider">
-            {{ selectedPeriod }} · Daily OHLC &amp; Volume
-          </div>
-          <div v-if="latestBar" class="text-sm font-mono text-gray-300 mt-0.5">
-            <span class="text-gray-100 font-bold text-base">${{ parseFloat(latestBar.close).toFixed(2) }}</span>
-            <span class="text-gray-500 mx-1.5">·</span>
-            <span class="text-gray-400">Vol {{ latestVolume }}</span>
-          </div>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <div class="flex items-center bg-terminal-bg/60 border border-white/10 rounded-xl p-1">
-            <button
-              v-for="p in periods"
-              :key="p"
-              class="min-w-[42px] h-8 px-2.5 text-xs font-mono font-bold rounded-lg transition-all duration-150"
-              :class="selectedPeriod === p
-                ? 'bg-terminal-accent/20 text-terminal-accent shadow-sm'
-                : 'text-gray-400 hover:text-gray-200'"
-              @click="selectedPeriod = p"
-            >{{ p }}</button>
-          </div>
-          <button
-            type="button"
-            class="w-9 h-9 flex items-center justify-center rounded-xl border border-white/10 bg-terminal-bg/60 text-gray-300 hover:text-terminal-accent hover:border-terminal-accent/40 transition-colors active:scale-95"
-            :title="isFullscreen ? 'Exit full screen' : 'View in full screen'"
-            @click="toggleFullscreen"
-          >{{ isFullscreen ? '✕' : '⤢' }}</button>
-        </div>
+    <!-- Price band (centered) -->
+    <div class="flex flex-col items-center pb-2 leading-tight">
+      <div class="text-[9px] font-mono font-bold text-gray-500 uppercase tracking-widest">{{ priceLabel }}</div>
+      <div v-if="latestBar" class="text-lg sm:text-xl font-mono font-black text-gray-100 whitespace-nowrap">
+        {{ parseFloat(latestBar.close).toFixed(2) }}
+        <span class="text-xs font-bold text-gray-400 ml-1">{{ currencySymbol }}</span>
       </div>
     </div>
 
-    <!-- Active indicator chips (touch-friendly) + Add button -->
-    <div class="flex items-start gap-2 px-1 pb-2.5">
+    <!-- Single toolbar row: [+ Indicator][chips scrollable][spacer][period pills][fullscreen] -->
+    <div class="flex items-center gap-1.5 px-1 pb-2.5">
       <button
         type="button"
-        class="shrink-0 flex items-center gap-1.5 px-3 h-9 rounded-xl border border-terminal-accent/40 bg-terminal-accent/10 text-terminal-accent text-sm font-mono font-bold hover:bg-terminal-accent/20 active:scale-95 transition-all"
+        class="shrink-0 flex items-center gap-1 px-2.5 h-8 rounded-lg border border-terminal-accent/40 bg-terminal-accent/10 text-terminal-accent text-xs font-mono font-bold hover:bg-terminal-accent/20 active:scale-95 transition-all"
         @click="isIndicatorPickerOpen = true"
       >
-        <span class="text-base leading-none">+</span>
+        <span class="text-sm leading-none">+</span>
         <span>Indicator</span>
       </button>
 
-      <div v-if="activeIndicators.length" class="flex flex-wrap gap-1.5 min-w-0 flex-1">
+      <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0">
         <span
           v-for="def in activeIndicators"
           :key="def.key"
-          class="inline-flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-xl border text-xs font-mono font-bold cursor-pointer active:scale-95 transition-all"
+          class="shrink-0 inline-flex items-center gap-1 h-8 pl-2.5 pr-1 rounded-lg border text-[11px] font-mono font-bold cursor-pointer active:scale-95 transition-all"
           :style="{ borderColor: def.color + '70', color: def.color, backgroundColor: def.color + '18' }"
           @click="openAnalysis(def)"
         >
           {{ indicatorLabel(def) }}
           <button
             type="button"
-            class="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white/15 text-current opacity-80"
+            class="w-5 h-5 flex items-center justify-center rounded hover:bg-white/15 text-current opacity-80"
             @click.stop="removeIndicator(def.key)"
             aria-label="Remove indicator"
           >✕</button>
         </span>
       </div>
-      <span v-else class="text-xs font-mono text-gray-500 self-center hidden sm:block">
-        No indicators added yet
-      </span>
+
+      <div class="shrink-0 flex items-center bg-terminal-bg/60 border border-white/10 rounded-lg p-0.5">
+        <button
+          v-for="p in periods"
+          :key="p"
+          class="min-w-[30px] h-7 px-1.5 text-[10px] font-mono font-bold rounded-md transition-all duration-150"
+          :class="selectedPeriod === p
+            ? 'bg-terminal-accent/20 text-terminal-accent shadow-sm'
+            : 'text-gray-400 hover:text-gray-200'"
+          @click="selectedPeriod = p"
+        >{{ p }}</button>
+      </div>
+
+      <button
+        type="button"
+        class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-white/10 bg-terminal-bg/60 text-gray-300 hover:text-terminal-accent hover:border-terminal-accent/40 transition-colors active:scale-95"
+        :title="isFullscreen ? 'Exit full screen' : 'View in full screen'"
+        @click="toggleFullscreen"
+      >{{ isFullscreen ? '✕' : '⤢' }}</button>
     </div>
 
     <!-- Indicator picker (bottom sheet on mobile, dialog on desktop) -->

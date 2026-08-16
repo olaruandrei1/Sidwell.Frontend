@@ -341,47 +341,33 @@ const moreIcon       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 
 /* ─── iOS 26 Liquid Glass Mobile Dock ───────────────────────────── */
 .sw-liquid-dock {
-  /* Sit above home-indicator area, respect safe area */
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.35));
 }
 
 .sw-liquid-dock__shell {
-  /* Translucent glass — light theme */
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: var(--dock-bg);
+  border: 1px solid var(--dock-border);
   border-radius: 28px;
   backdrop-filter: saturate(180%) blur(28px);
   -webkit-backdrop-filter: saturate(180%) blur(28px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.05),
-    0 8px 24px rgba(15, 23, 42, 0.12);
+    inset 0 1px 0 var(--dock-inner-top),
+    inset 0 -1px 0 var(--dock-inner-bottom),
+    var(--dock-shadow);
   overflow: hidden;
 }
 
-/* Dark theme: same glass but darker base */
-:global(html[data-theme="dark"]) .sw-liquid-dock__shell {
-  background: rgba(23, 27, 34, 0.78);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 8px 24px rgba(0, 0, 0, 0.45);
-}
-
-/* Sliding liquid pill — sits behind tabs, animates transform + subtle scale */
 .sw-liquid-dock__pill {
   position: absolute;
   top: 6px;
   bottom: 6px;
   left: 6px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--dock-pill-bg);
   border-radius: 22px;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9),
-    0 6px 16px rgba(59, 130, 246, 0.22),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+    inset 0 1px 0 var(--dock-pill-inner-top),
+    var(--dock-pill-glow);
   transition:
     transform 0.55s cubic-bezier(0.22, 1.2, 0.36, 1),
     width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
@@ -390,31 +376,16 @@ const moreIcon       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
   z-index: 0;
 }
 
-:global(html[data-theme="dark"]) .sw-liquid-dock__pill {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 6px 16px rgba(56, 189, 248, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
-}
-
-/* Tabs */
 .sw-liquid-dock__tab {
   position: relative;
   z-index: 1;
-  color: rgba(15, 23, 42, 0.55);
+  color: var(--dock-tab-inactive);
   padding: 0 4px;
   transition: color 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
-:global(html[data-theme="dark"]) .sw-liquid-dock__tab {
-  color: rgba(226, 232, 240, 0.55);
-}
 
 .sw-liquid-dock__tab--active {
-  color: #2563EB; /* iOS blue */
-}
-:global(html[data-theme="dark"]) .sw-liquid-dock__tab--active {
-  color: #38BDF8; /* softer sky-blue on dark */
+  color: var(--dock-tab-active);
 }
 
 .sw-liquid-dock__tab:active {
@@ -422,7 +393,6 @@ const moreIcon       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
   transition: transform 0.1s ease-out;
 }
 
-/* Reduce motion — honor user preference */
 @media (prefers-reduced-motion: reduce) {
   .sw-liquid-dock__pill {
     transition: transform 0.15s linear, width 0.15s linear;

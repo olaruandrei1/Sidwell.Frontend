@@ -71,20 +71,86 @@ const INDICATOR_INFO: Record<string, IndicatorInfo> = {
   }
 };
 
-const TREND_READ: Record<string, { label: string; action: string; color: string }> = {
-  above: { label: 'Price is trading above this line.', action: 'Consistent with a short-term uptrend.', color: '#34D399' },
-  below: { label: 'Price is trading below this line.', action: 'Consistent with a short-term downtrend.', color: '#F87171' },
-  at: { label: 'Price is sitting right at this line.', action: 'No clear lean either way.', color: '#94A3B8' },
-  overbought: { label: 'RSI is in overbought territory (≥70).', action: 'Momentum may be stretched — some pullback risk.', color: '#F87171' },
-  oversold: { label: 'RSI is in oversold territory (≤30).', action: 'Selling may be exhausted — watch for a bounce.', color: '#34D399' },
-  neutral: { label: 'RSI is in the neutral zone.', action: 'No extreme reading either way.', color: '#94A3B8' },
-  'above-upper-band': { label: 'Price has pushed above the upper band.', action: 'Stretched to the upside — often mean-reverts short term.', color: '#FBBF24' },
-  'below-lower-band': { label: 'Price has dropped below the lower band.', action: 'Stretched to the downside — often mean-reverts short term.', color: '#FBBF24' },
-  'within-bands': { label: 'Price is trading within the bands.', action: 'Normal volatility range, no extreme.', color: '#94A3B8' },
-  'bullish-crossover': { label: 'MACD line is above the signal line.', action: 'Momentum is turning positive.', color: '#34D399' },
-  'bearish-crossover': { label: 'MACD line is below the signal line.', action: 'Momentum is turning negative.', color: '#F87171' },
-  'strong-trend': { label: 'ADX ≥ 25 — a real trend is in place.', action: 'Trend-following favored over range-trading here.', color: '#34D399' },
-  'weak-trend': { label: 'ADX < 25 — no strong trend.', action: 'Choppy/range-bound — directional signals are less reliable.', color: '#94A3B8' }
+interface TrendCall { label: string; action: string; verdict: string; color: string; }
+const TREND_READ: Record<string, TrendCall> = {
+  above: {
+    label: 'Price is trading above this line.',
+    action: 'Consistent with a short-term uptrend.',
+    verdict: 'Hold them — or open a long CFD position if you\'re not in yet.',
+    color: '#34D399'
+  },
+  below: {
+    label: 'Price is trading below this line.',
+    action: 'Consistent with a short-term downtrend.',
+    verdict: 'Sell and wait for a better entry near the average — or open a short CFD if that\'s your play.',
+    color: '#F87171'
+  },
+  at: {
+    label: 'Price is sitting right at this line.',
+    action: 'No clear lean either way.',
+    verdict: 'Hold them boy — don\'t chase, don\'t dump.',
+    color: '#94A3B8'
+  },
+  overbought: {
+    label: 'RSI is in overbought territory (≥70).',
+    action: 'Momentum may be stretched — some pullback risk.',
+    verdict: 'Trim on strength or wait — a short CFD is a play if you have appetite for it.',
+    color: '#F87171'
+  },
+  oversold: {
+    label: 'RSI is in oversold territory (≤30).',
+    action: 'Selling may be exhausted — watch for a bounce.',
+    verdict: 'Consider a long entry or CFD — bounce probability elevated but not certain.',
+    color: '#34D399'
+  },
+  neutral: {
+    label: 'RSI is in the neutral zone.',
+    action: 'No extreme reading either way.',
+    verdict: 'Hold them boy — no strong signal to trade on.',
+    color: '#94A3B8'
+  },
+  'above-upper-band': {
+    label: 'Price has pushed above the upper band.',
+    action: 'Stretched to the upside — often mean-reverts short term.',
+    verdict: 'Consider trimming; a short CFD play is possible for mean-reversion traders.',
+    color: '#FBBF24'
+  },
+  'below-lower-band': {
+    label: 'Price has dropped below the lower band.',
+    action: 'Stretched to the downside — often mean-reverts short term.',
+    verdict: 'Consider a long entry or CFD for a bounce back into the bands.',
+    color: '#FBBF24'
+  },
+  'within-bands': {
+    label: 'Price is trading within the bands.',
+    action: 'Normal volatility range, no extreme.',
+    verdict: 'Hold them boy — no volatility signal to trade on.',
+    color: '#94A3B8'
+  },
+  'bullish-crossover': {
+    label: 'MACD line is above the signal line.',
+    action: 'Momentum is turning positive.',
+    verdict: 'Hold them — momentum favors long CFDs.',
+    color: '#34D399'
+  },
+  'bearish-crossover': {
+    label: 'MACD line is below the signal line.',
+    action: 'Momentum is turning negative.',
+    verdict: 'Sell or open a short CFD — momentum has flipped down.',
+    color: '#F87171'
+  },
+  'strong-trend': {
+    label: 'ADX ≥ 25 — a real trend is in place.',
+    action: 'Trend-following favored over range-trading here.',
+    verdict: 'Ride the trend with the position/CFD direction — don\'t fade it.',
+    color: '#34D399'
+  },
+  'weak-trend': {
+    label: 'ADX < 25 — no strong trend.',
+    action: 'Choppy/range-bound — directional signals are less reliable.',
+    verdict: 'Hold them boy — mean-reversion strategies fit better than trend-following.',
+    color: '#94A3B8'
+  }
 };
 
 const info = computed(() => INDICATOR_INFO[props.kind]);
@@ -148,9 +214,12 @@ function formatValue(v: number | string): string {
       </div>
 
       <!-- recommendation -->
-      <div v-if="trendRead" class="rounded-xl border p-3.5" :style="{ borderColor: trendRead.color + '50', backgroundColor: trendRead.color + '12' }">
+      <div v-if="trendRead" class="rounded-xl border p-3.5 space-y-2" :style="{ borderColor: trendRead.color + '50', backgroundColor: trendRead.color + '12' }">
         <div class="text-sm font-bold" :style="{ color: trendRead.color }">{{ trendRead.label }}</div>
-        <div class="text-xs text-gray-300 mt-1">{{ trendRead.action }}</div>
+        <div class="text-xs text-gray-300">{{ trendRead.action }}</div>
+        <div class="text-xs font-semibold pt-2 border-t" :style="{ borderColor: trendRead.color + '30', color: trendRead.color }">
+          → {{ trendRead.verdict }}
+        </div>
       </div>
       <div v-else class="rounded-xl border border-white/10 bg-white/5 p-3.5 text-xs text-gray-400">
         This indicator doesn't produce a standalone directional signal — read it alongside price action and the other active indicators.
