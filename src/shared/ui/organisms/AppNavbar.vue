@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useBreakpoint } from '../../composables/useBreakpoint';
@@ -45,6 +45,43 @@ function handleLogout() {
   authStore.logout();
   router.push({ name: 'login' });
 }
+
+// ── Liquid indicator position tracking ───────────────────────────────
+const dockWidthPx = ref(0);
+const totalMobileTabs = computed(() => mobilePrimaryItems.value.length + 1);
+
+const activeTabIndex = computed(() => {
+  if (showMore.value) return mobilePrimaryItems.value.length;
+  const idx = mobilePrimaryItems.value.findIndex((i) => i.name === currentRouteName.value);
+  return idx >= 0 ? idx : 0;
+});
+
+const tabWidthPct = computed(() => 100 / totalMobileTabs.value);
+const activeTabOffsetPx = computed(() => {
+  const usable = dockWidthPx.value - 12; // account for horizontal padding (px-1.5 both sides = 12px)
+  return (usable / totalMobileTabs.value) * activeTabIndex.value;
+});
+
+function measureDock() {
+  const dock = document.querySelector<HTMLElement>('.sw-liquid-dock__shell');
+  if (dock) dockWidthPx.value = dock.getBoundingClientRect().width;
+}
+function onTabClick(_idx: number) {
+  // reserved — route change already triggers indicator via computed
+  showMore.value = false;
+}
+function onMoreClick() {
+  showMore.value = !showMore.value;
+}
+
+onMounted(() => {
+  nextTick(measureDock);
+  window.addEventListener('resize', measureDock);
+});
+onUnmounted(() => {
+  window.removeEventListener('resize', measureDock);
+});
+watch(isMobile, () => nextTick(measureDock));
 
 /* ── Modern Vector Icons ────────────────────────────────────────────────── */
 const dashboardIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
@@ -182,40 +219,50 @@ const moreIcon       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
     </div>
   </header>
 
-  <!-- Mobile Floating Dock (Fixed Label Overlap Bug!) -->
+  <!-- Mobile Liquid Glass Dock (iOS 26 style) — animated pill indicator -->
   <nav
     v-if="isMobile"
-    class="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] max-w-sm h-14
-           bg-terminal-surface/95 backdrop-blur-md flex items-center justify-between px-1.5 rounded-2xl
-           border border-terminal-border shadow-xl select-none"
+    class="sw-liquid-dock fixed bottom-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1rem)] max-w-md h-16 select-none"
+    :aria-label="t('nav.dashboard')"
   >
-    <router-link
-      v-for="item in mobilePrimaryItems"
-      :key="item.name"
-      :to="{ name: item.name }"
-      class="flex flex-col items-center justify-center flex-1 min-w-0 py-1 px-1 rounded-xl transition-all duration-150 group"
-      :class="currentRouteName === item.name ? 'text-terminal-accent' : 'text-gray-400 hover:text-white'"
-    >
-      <span
-        class="w-5 h-5 flex-shrink-0 transition-transform duration-150"
-        :class="currentRouteName === item.name ? 'scale-105' : ''"
-        v-html="item.icon"
+    <div class="sw-liquid-dock__shell relative h-full flex items-stretch px-1.5 gap-0" role="tablist">
+      <!-- Animated liquid indicator (moves + morphs) -->
+      <div
+        class="sw-liquid-dock__pill"
+        :style="{
+          transform: `translate3d(${activeTabOffsetPx}px, 0, 0)`,
+          width: `${tabWidthPct}%`
+        }"
       />
-      <span class="text-[10px] leading-tight font-medium tracking-tight truncate max-w-full block w-full text-center mt-0.5">
-        {{ item.label }}
-      </span>
-    </router-link>
 
-    <!-- More Drawer Trigger -->
-    <div class="relative flex-1 min-w-0">
+      <router-link
+        v-for="(item, idx) in mobilePrimaryItems"
+        :key="item.name"
+        :to="{ name: item.name }"
+        role="tab"
+        :aria-selected="currentRouteName === item.name"
+        class="sw-liquid-dock__tab relative flex-1 flex flex-col items-center justify-center gap-0.5 min-w-0 rounded-2xl transition-colors duration-200"
+        :class="currentRouteName === item.name ? 'sw-liquid-dock__tab--active' : ''"
+        @click="onTabClick(idx)"
+      >
+        <span class="w-[22px] h-[22px] flex-shrink-0 transition-transform duration-300 ease-out"
+              :style="currentRouteName === item.name ? 'transform: scale(1.08) translateY(-1px)' : ''"
+              v-html="item.icon" />
+        <span class="text-[10px] leading-tight font-semibold tracking-tight truncate max-w-full block w-full text-center">
+          {{ item.label }}
+        </span>
+      </router-link>
+
       <button
         type="button"
-        @click="showMore = !showMore"
-        class="flex flex-col items-center justify-center w-full py-1 px-1 rounded-xl transition-all duration-150"
-        :class="showMore ? 'text-terminal-accent' : 'text-gray-400 hover:text-white'"
+        role="tab"
+        :aria-selected="showMore"
+        @click="onMoreClick"
+        class="sw-liquid-dock__tab relative flex-1 flex flex-col items-center justify-center gap-0.5 min-w-0 rounded-2xl transition-colors duration-200"
+        :class="showMore ? 'sw-liquid-dock__tab--active' : ''"
       >
-        <span class="w-5 h-5 flex-shrink-0" v-html="moreIcon" />
-        <span class="text-[10px] leading-tight font-medium tracking-tight truncate max-w-full block w-full text-center mt-0.5">
+        <span class="w-[22px] h-[22px] flex-shrink-0" v-html="moreIcon" />
+        <span class="text-[10px] leading-tight font-semibold tracking-tight truncate max-w-full block w-full text-center">
           {{ t('common.more') || 'More' }}
         </span>
       </button>
@@ -290,5 +337,95 @@ const moreIcon       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 .pop-leave-to {
   opacity: 0;
   transform: translateY(8px) scale(0.95);
+}
+
+/* ─── iOS 26 Liquid Glass Mobile Dock ───────────────────────────── */
+.sw-liquid-dock {
+  /* Sit above home-indicator area, respect safe area */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.35));
+}
+
+.sw-liquid-dock__shell {
+  /* Translucent glass — light theme */
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 28px;
+  backdrop-filter: saturate(180%) blur(28px);
+  -webkit-backdrop-filter: saturate(180%) blur(28px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05),
+    0 8px 24px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+/* Dark theme: same glass but darker base */
+:global(html[data-theme="dark"]) .sw-liquid-dock__shell {
+  background: rgba(23, 27, 34, 0.78);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Sliding liquid pill — sits behind tabs, animates transform + subtle scale */
+.sw-liquid-dock__pill {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 22px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9),
+    0 6px 16px rgba(59, 130, 246, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+  transition:
+    transform 0.55s cubic-bezier(0.22, 1.2, 0.36, 1),
+    width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, width;
+  pointer-events: none;
+  z-index: 0;
+}
+
+:global(html[data-theme="dark"]) .sw-liquid-dock__pill {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 6px 16px rgba(56, 189, 248, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Tabs */
+.sw-liquid-dock__tab {
+  position: relative;
+  z-index: 1;
+  color: rgba(15, 23, 42, 0.55);
+  padding: 0 4px;
+  transition: color 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+:global(html[data-theme="dark"]) .sw-liquid-dock__tab {
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.sw-liquid-dock__tab--active {
+  color: #2563EB; /* iOS blue */
+}
+:global(html[data-theme="dark"]) .sw-liquid-dock__tab--active {
+  color: #38BDF8; /* softer sky-blue on dark */
+}
+
+.sw-liquid-dock__tab:active {
+  transform: scale(0.94);
+  transition: transform 0.1s ease-out;
+}
+
+/* Reduce motion — honor user preference */
+@media (prefers-reduced-motion: reduce) {
+  .sw-liquid-dock__pill {
+    transition: transform 0.15s linear, width 0.15s linear;
+  }
 }
 </style>
