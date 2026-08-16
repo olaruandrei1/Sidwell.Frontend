@@ -18,6 +18,7 @@ import type { PriceBar, IndicatorSeriesDto, IndicatorPointDto } from '../../api/
 import { useTickerIndicatorsQuery } from '../../../queries/useTickerIndicatorsQuery';
 import { useThemeStore } from '../../../stores/theme';
 import IndicatorAnalysisPanel from './IndicatorAnalysisPanel.vue';
+import AdaptiveOverlay from './AdaptiveOverlay.vue';
 
 use([
   CanvasRenderer,
@@ -133,6 +134,7 @@ function indicatorLabel(def: IndicatorDef): string {
 // ── analysis panel ───────────────────────────────────────────────────────
 const activePanel = ref<IndicatorDef | null>(null);
 const isAnalysisOpen = ref(false);
+const isIndicatorPickerOpen = ref(false);
 function openAnalysis(def: IndicatorDef) {
   activePanel.value = def;
   isAnalysisOpen.value = true;
@@ -429,73 +431,128 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
     :class="isFullscreen ? 'bg-terminal-bg h-screen w-screen fixed inset-0 z-50 flex flex-col' : ''"
   >
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between px-1 pb-3 gap-2">
-      <div class="flex items-center gap-3 flex-wrap">
-        <span class="text-xs font-mono font-bold text-gray-400 uppercase tracking-widest">
-          {{ selectedPeriod }} Daily OHLC &amp; Volume
-        </span>
-        <span v-if="latestBar" class="text-xs font-mono text-gray-400">
-          Latest: <span class="text-gray-100 font-bold">${{ parseFloat(latestBar.close).toFixed(2) }}</span>
-          &nbsp;|&nbsp; Vol: <span class="text-gray-200 font-semibold">{{ latestVolume }}</span>
-        </span>
-      </div>
-      <div class="flex items-center gap-1.5 self-end sm:self-auto">
-        <button
-          v-for="p in periods"
-          :key="p"
-          class="px-3 py-1 text-xs font-mono font-bold rounded-lg border transition-all duration-150 btn-press"
-          :class="selectedPeriod === p
-            ? 'bg-terminal-accent/20 border-terminal-accent/50 text-terminal-accent shadow-sm'
-            : 'bg-transparent border-white/10 text-gray-400 hover:text-gray-200 hover:border-white/20'"
-          @click="selectedPeriod = p"
-        >{{ p }}</button>
-        <button
-          type="button"
-          class="px-2.5 py-1 text-xs font-mono font-bold rounded-lg border border-white/10 bg-transparent text-gray-400 hover:text-terminal-accent hover:border-terminal-accent/40 transition-colors"
-          :title="isFullscreen ? 'Exit full screen' : 'View in full screen'"
-          @click="toggleFullscreen"
-        >{{ isFullscreen ? '✕ Exit' : '⤢ Full screen' }}</button>
+    <div class="flex flex-col gap-2.5 px-1 pb-3">
+      <div class="flex items-baseline justify-between gap-3 flex-wrap">
+        <div>
+          <div class="text-[11px] font-mono font-bold text-gray-400 uppercase tracking-wider">
+            {{ selectedPeriod }} · Daily OHLC &amp; Volume
+          </div>
+          <div v-if="latestBar" class="text-sm font-mono text-gray-300 mt-0.5">
+            <span class="text-gray-100 font-bold text-base">${{ parseFloat(latestBar.close).toFixed(2) }}</span>
+            <span class="text-gray-500 mx-1.5">·</span>
+            <span class="text-gray-400">Vol {{ latestVolume }}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <div class="flex items-center bg-terminal-bg/60 border border-white/10 rounded-xl p-1">
+            <button
+              v-for="p in periods"
+              :key="p"
+              class="min-w-[42px] h-8 px-2.5 text-xs font-mono font-bold rounded-lg transition-all duration-150"
+              :class="selectedPeriod === p
+                ? 'bg-terminal-accent/20 text-terminal-accent shadow-sm'
+                : 'text-gray-400 hover:text-gray-200'"
+              @click="selectedPeriod = p"
+            >{{ p }}</button>
+          </div>
+          <button
+            type="button"
+            class="w-9 h-9 flex items-center justify-center rounded-xl border border-white/10 bg-terminal-bg/60 text-gray-300 hover:text-terminal-accent hover:border-terminal-accent/40 transition-colors active:scale-95"
+            :title="isFullscreen ? 'Exit full screen' : 'View in full screen'"
+            @click="toggleFullscreen"
+          >{{ isFullscreen ? '✕' : '⤢' }}</button>
+        </div>
       </div>
     </div>
 
-    <!-- Indicators toolbar -->
-    <div class="flex flex-wrap items-center gap-2 px-1 pb-2.5">
-      <select v-model="newIndicatorKind" class="bg-terminal-bg border border-terminal-border rounded-lg px-2 py-1.5 text-[11px] font-mono text-gray-200 focus:outline-none focus:border-terminal-accent">
-        <option value="sma">SMA</option>
-        <option value="ema">EMA</option>
-        <option value="bb">Bollinger Bands</option>
-        <option value="rsi">RSI</option>
-        <option value="macd">MACD (12/26/9)</option>
-        <option value="adx">ADX</option>
-        <option value="atr">ATR</option>
-        <option value="obv">OBV</option>
-      </select>
-      <input
-        v-if="!['macd', 'obv'].includes(newIndicatorKind)"
-        v-model.number="newIndicatorPeriod"
-        type="number" min="2" max="500"
-        class="w-16 bg-terminal-bg border border-terminal-border rounded-lg px-2 py-1.5 text-[11px] font-mono text-gray-200 focus:outline-none focus:border-terminal-accent"
-      />
-      <button type="button" class="px-2.5 py-1.5 text-[11px] font-mono font-bold rounded-lg border border-terminal-accent/40 text-terminal-accent hover:bg-terminal-accent/10 transition-colors" @click="addFromDropdown">+ Add</button>
-      <span class="text-[10px] text-gray-600 font-mono px-1">quick:</span>
-      <button type="button" class="px-2 py-1 text-[10px] font-mono text-gray-400 hover:text-terminal-accent rounded-md border border-white/10 hover:border-terminal-accent/40 transition-colors" @click="addIndicator('sma', 20)">SMA20</button>
-      <button type="button" class="px-2 py-1 text-[10px] font-mono text-gray-400 hover:text-terminal-accent rounded-md border border-white/10 hover:border-terminal-accent/40 transition-colors" @click="addIndicator('sma', 50)">SMA50</button>
-      <button type="button" class="px-2 py-1 text-[10px] font-mono text-gray-400 hover:text-terminal-accent rounded-md border border-white/10 hover:border-terminal-accent/40 transition-colors" @click="addIndicator('sma', 200)">SMA200</button>
+    <!-- Active indicator chips (touch-friendly) + Add button -->
+    <div class="flex items-start gap-2 px-1 pb-2.5">
+      <button
+        type="button"
+        class="shrink-0 flex items-center gap-1.5 px-3 h-9 rounded-xl border border-terminal-accent/40 bg-terminal-accent/10 text-terminal-accent text-sm font-mono font-bold hover:bg-terminal-accent/20 active:scale-95 transition-all"
+        @click="isIndicatorPickerOpen = true"
+      >
+        <span class="text-base leading-none">+</span>
+        <span>Indicator</span>
+      </button>
 
-      <div v-if="activeIndicators.length" class="flex flex-wrap items-center gap-1.5 ml-1 pl-2 border-l border-white/10">
+      <div v-if="activeIndicators.length" class="flex flex-wrap gap-1.5 min-w-0 flex-1">
         <span
           v-for="def in activeIndicators"
           :key="def.key"
-          class="flex items-center gap-1 px-2 py-1 text-[10px] font-mono font-bold rounded-md border cursor-pointer hover:brightness-125 transition-all"
-          :style="{ borderColor: def.color + '60', color: def.color, backgroundColor: def.color + '15' }"
-          :title="'View analysis for ' + indicatorLabel(def)"
+          class="inline-flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-xl border text-xs font-mono font-bold cursor-pointer active:scale-95 transition-all"
+          :style="{ borderColor: def.color + '70', color: def.color, backgroundColor: def.color + '18' }"
           @click="openAnalysis(def)"
         >
           {{ indicatorLabel(def) }}
-          <button type="button" class="opacity-70 hover:opacity-100" @click.stop="removeIndicator(def.key)">✕</button>
+          <button
+            type="button"
+            class="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-white/15 text-current opacity-80"
+            @click.stop="removeIndicator(def.key)"
+            aria-label="Remove indicator"
+          >✕</button>
         </span>
       </div>
+      <span v-else class="text-xs font-mono text-gray-500 self-center hidden sm:block">
+        No indicators added yet
+      </span>
     </div>
+
+    <!-- Indicator picker (bottom sheet on mobile, dialog on desktop) -->
+    <AdaptiveOverlay v-model="isIndicatorPickerOpen" title="Add indicator" :max-width="480">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider mb-2">Type</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="kind in (['sma','ema','bb','rsi','macd','adx','atr','obv'] as IndicatorKind[])"
+              :key="kind"
+              type="button"
+              class="h-12 rounded-xl border text-sm font-mono font-bold transition-all active:scale-95"
+              :class="newIndicatorKind === kind
+                ? 'border-terminal-accent/60 bg-terminal-accent/15 text-terminal-accent'
+                : 'border-white/10 bg-white/5 text-gray-300 hover:border-white/20'"
+              @click="newIndicatorKind = kind"
+            >{{ kind === 'bb' ? 'Bollinger' : kind === 'macd' ? 'MACD (12/26/9)' : kind.toUpperCase() }}</button>
+          </div>
+        </div>
+
+        <div v-if="!['macd', 'obv'].includes(newIndicatorKind)">
+          <label class="block text-[10px] font-mono font-bold text-gray-500 uppercase tracking-wider mb-2">Period</label>
+          <div class="flex items-center gap-2">
+            <input
+              v-model.number="newIndicatorPeriod"
+              type="number" min="2" max="500"
+              class="w-24 h-12 bg-terminal-bg border border-white/10 rounded-xl px-3 text-base font-mono text-gray-100 focus:outline-none focus:border-terminal-accent text-center"
+            />
+            <div class="flex flex-wrap gap-1.5 flex-1">
+              <button
+                v-for="q in [20, 50, 100, 200]"
+                :key="q"
+                type="button"
+                class="h-9 px-3 rounded-lg text-xs font-mono font-bold border transition-all active:scale-95"
+                :class="newIndicatorPeriod === q
+                  ? 'border-terminal-accent/50 text-terminal-accent bg-terminal-accent/10'
+                  : 'border-white/10 text-gray-400 hover:text-gray-200'"
+                @click="newIndicatorPeriod = q"
+              >{{ q }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #actions>
+        <button
+          type="button"
+          class="flex-1 h-11 rounded-xl border border-white/10 bg-white/5 text-sm font-mono font-bold text-gray-300 hover:text-gray-100 transition-colors"
+          @click="isIndicatorPickerOpen = false"
+        >Cancel</button>
+        <button
+          type="button"
+          class="flex-1 h-11 rounded-xl bg-terminal-accent text-terminal-bg text-sm font-mono font-bold hover:brightness-110 active:scale-95 transition-all"
+          @click="addFromDropdown(); isIndicatorPickerOpen = false"
+        >+ Add to chart</button>
+      </template>
+    </AdaptiveOverlay>
 
     <div :class="isFullscreen ? 'flex-1 relative' : 'relative'">
       <VChart

@@ -26,7 +26,7 @@ import { usePortfolioQuery } from '../../queries/usePortfolioQuery';
 import type { PortfolioPnlEntryDto } from '../../queries/useFinancesQuery';
 import type { ExpenseItemDto, WealthAllocationDto, ExchangeRateDto } from '../../shared/api/types';
 import { api } from '../../shared/api/client';
-import { X, Pencil, Check, Trash2 } from 'lucide-vue-next';
+import { X, Pencil, Check, Trash2 } from '@lucide/vue';
 
 const { t } = useI18n();
 const financesStore = useFinancesStore();

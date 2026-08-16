@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { X } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { X } from '@lucide/vue';
 import { useBreakpoint } from '../../composables/useBreakpoint';
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     modelValue: boolean;
     title?: string;
@@ -25,23 +25,44 @@ const emit = defineEmits<{
 
 const { isOverlaySheet } = useBreakpoint();
 
-const currentSnap = ref<'peek' | 'full'>(props.initialSnap);
-
-watch(
-  () => props.initialSnap,
-  (val) => {
-    currentSnap.value = val;
-  }
-);
-
 const handleClose = () => {
   emit('update:modelValue', false);
   emit('close');
 };
 
-const toggleSnap = () => {
-  currentSnap.value = currentSnap.value === 'peek' ? 'full' : 'peek';
-};
+// ── drag-to-close on mobile bottom sheet ─────────────────────────────
+const dragOffset = ref(0);
+const isDragging = ref(false);
+const sheetRef = ref<HTMLElement | null>(null);
+let dragStartY = 0;
+
+function pointerY(e: TouchEvent | MouseEvent): number | null {
+  if ('touches' in e) return e.touches[0]?.clientY ?? null;
+  return (e as MouseEvent).clientY;
+}
+function onDragStart(e: TouchEvent | MouseEvent) {
+  const y = pointerY(e);
+  if (y === null) return;
+  dragStartY = y;
+  isDragging.value = true;
+  dragOffset.value = 0;
+}
+function onDragMove(e: TouchEvent | MouseEvent) {
+  if (!isDragging.value) return;
+  const currentY = pointerY(e);
+  if (currentY === null) return;
+  const delta = currentY - dragStartY;
+  if (delta > 0) dragOffset.value = delta;
+}
+function onDragEnd() {
+  if (!isDragging.value) return;
+  const sheetHeight = sheetRef.value?.getBoundingClientRect().height ?? 400;
+  if (dragOffset.value > sheetHeight * 0.28) {
+    handleClose();
+  }
+  isDragging.value = false;
+  dragOffset.value = 0;
+}
 </script>
 
 <template>
@@ -53,53 +74,51 @@ const toggleSnap = () => {
     :persistent="persistent || false"
     inset
     class="adaptive-sheet"
-    :class="currentSnap === 'peek' ? 'snap-peek' : 'snap-full'"
   >
     <div
-      class="sw-glass-card border-t border-white/15 rounded-t-3xl overflow-hidden flex flex-col shadow-2xl transition-all duration-200 backdrop-blur-2xl"
-      :style="{ maxHeight: currentSnap === 'peek' ? '45vh' : '90vh', minHeight: currentSnap === 'peek' ? '35vh' : '85vh' }"
+      ref="sheetRef"
+      class="sw-glass-card border-t border-white/15 rounded-t-3xl overflow-hidden flex flex-col shadow-2xl backdrop-blur-2xl w-full"
+      :style="{
+        maxHeight: '92vh',
+        minHeight: '55vh',
+        transform: `translateY(${dragOffset}px)`,
+        transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)'
+      }"
       role="dialog"
       aria-modal="true"
     >
-      <!-- Sheet Drag Handle / Header -->
-      <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between bg-terminal-surface-light/60 select-none">
-        <div class="flex items-center gap-3">
+      <!-- Draggable handle area (top ~40px, includes title) -->
+      <div
+        class="px-5 pt-3 pb-3 border-b border-white/10 flex flex-col gap-2 bg-terminal-surface-light/60 select-none touch-none cursor-grab active:cursor-grabbing"
+        @touchstart.passive="onDragStart"
+        @touchmove.passive="onDragMove"
+        @touchend="onDragEnd"
+        @mousedown="onDragStart"
+        @mousemove="onDragMove"
+        @mouseup="onDragEnd"
+        @mouseleave="onDragEnd"
+      >
+        <div class="w-12 h-1.5 bg-gray-500/70 rounded-full mx-auto" aria-hidden="true" />
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="font-mono text-base font-bold text-gray-100 truncate flex-1">{{ title }}</h3>
           <button
             type="button"
-            @click="toggleSnap"
-            class="w-10 h-1.5 bg-gray-400 hover:bg-white rounded-full cursor-pointer transition-colors"
-            title="Toggle sheet height"
-            aria-label="Toggle sheet snap point"
-          />
-          <h3 class="font-mono text-base font-bold text-gray-100 truncate">{{ title }}</h3>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button
-            type="button"
-            @click="toggleSnap"
-            class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border border-white/15 text-gray-300 hover:text-white hover:bg-white/10"
+            @click.stop="handleClose"
+            class="shrink-0 w-9 h-9 flex items-center justify-center text-gray-300 hover:text-white rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all"
+            aria-label="Close"
           >
-            {{ currentSnap === 'peek' ? '▲ FULL' : '▼ PEEK' }}
-          </button>
-          <button
-            type="button"
-            @click="emit('update:modelValue', false)"
-            class="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 flex items-center"
-            aria-label="Close modal"
-          >
-            <X :size="16" />
+            <X :size="18" />
           </button>
         </div>
       </div>
 
       <!-- Body -->
-      <div class="p-5 overflow-y-auto flex-1 font-sans text-sm text-gray-300">
+      <div class="p-5 overflow-y-auto flex-1 font-sans text-sm text-gray-300 overscroll-contain">
         <slot />
       </div>
 
       <!-- Footer / Actions -->
-      <div v-if="$slots.actions" class="px-5 py-4 border-t border-white/10 bg-terminal-surface flex items-center justify-end space-x-3">
+      <div v-if="$slots.actions" class="px-5 py-4 border-t border-white/10 bg-terminal-surface flex flex-wrap items-center justify-end gap-2">
         <slot name="actions" />
       </div>
     </div>
@@ -126,10 +145,10 @@ const toggleSnap = () => {
         </slot>
         <button
           @click="handleClose"
-          class="text-gray-400 hover:text-white p-1.5 rounded-lg transition-colors hover:bg-white/10 flex items-center"
+          class="shrink-0 w-9 h-9 flex items-center justify-center text-gray-300 hover:text-white rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all"
           aria-label="Close dialog"
         >
-          <X :size="16" />
+          <X :size="18" />
         </button>
       </div>
 

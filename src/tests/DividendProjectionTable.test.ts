@@ -15,9 +15,14 @@ describe('DividendProjectionTable.vue', () => {
       scenarios: [
         {
           year: 2026,
-          conservativeScenario: '840.00',
-          moderateScenario: '850.00',
-          historicScenario: '880.00'
+          annualConservative: '840.00',
+          annualModerate: '850.00',
+          annualAggressive: '860.00',
+          annualHistoric: '880.00',
+          cumulativeConservative: '840.00',
+          cumulativeModerate: '850.00',
+          cumulativeAggressive: '860.00',
+          cumulativeHistoric: '880.00'
         }
       ],
       assumptions: {

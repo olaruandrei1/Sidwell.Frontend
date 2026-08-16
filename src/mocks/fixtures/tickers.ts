@@ -241,14 +241,23 @@ export function getMockDividendProjection(symbol: string, endYear = 2060, reinve
   let historic = 0;
 
   for (let y = startYear; y <= endYear; y++) {
-    conservative += 120 * Math.pow(1.06, y - startYear);
-    moderate += 120 * Math.pow(1.08, y - startYear);
-    historic += 120 * Math.pow(1.12, y - startYear);
+    const annualConservative = 120 * Math.pow(1.06, y - startYear);
+    const annualModerate = 120 * Math.pow(1.08, y - startYear);
+    const annualAggressive = 120 * Math.pow(1.10, y - startYear);
+    const annualHistoric = 120 * Math.pow(1.12, y - startYear);
+    conservative += annualConservative;
+    moderate += annualModerate;
+    historic += annualHistoric;
     scenarios.push({
       year: y,
-      conservativeScenario: conservative.toFixed(2),
-      moderateScenario: moderate.toFixed(2),
-      historicScenario: historic.toFixed(2)
+      annualConservative: annualConservative.toFixed(2),
+      annualModerate: annualModerate.toFixed(2),
+      annualAggressive: annualAggressive.toFixed(2),
+      annualHistoric: annualHistoric.toFixed(2),
+      cumulativeConservative: conservative.toFixed(2),
+      cumulativeModerate: moderate.toFixed(2),
+      cumulativeAggressive: (conservative * 1.5).toFixed(2),
+      cumulativeHistoric: historic.toFixed(2)
     });
   }
 

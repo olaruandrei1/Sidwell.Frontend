@@ -33,7 +33,7 @@ watch(
 
 const hasHistoric = computed(() => {
   if (!props.projection || !props.projection.scenarios) return false;
-  return props.projection.scenarios.some((s) => s.historicScenario !== null);
+  return props.projection.scenarios.some((s) => s.annualHistoric !== null);
 });
 
 const handleApply = () => {
@@ -151,13 +151,13 @@ const formatAssumptionVal = (val: unknown): string => {
           >
             <td class="px-4 py-2.5 font-bold text-gray-200">{{ row.year }}</td>
             <td class="px-4 py-2.5 text-right font-semibold">
-              <MoneyText :value="row.conservativeScenario" currency="RON" :places="2" />
+              <MoneyText :value="row.annualConservative" currency="RON" :places="2" />
             </td>
             <td class="px-4 py-2.5 text-right font-semibold">
-              <MoneyText :value="row.moderateScenario" currency="RON" :places="2" />
+              <MoneyText :value="row.annualModerate" currency="RON" :places="2" />
             </td>
             <td v-if="hasHistoric" class="px-4 py-2.5 text-right font-semibold">
-              <MoneyText :value="row.historicScenario" currency="RON" :places="2" />
+              <MoneyText :value="row.annualHistoric" currency="RON" :places="2" />
             </td>
           </tr>
         </tbody>
@@ -178,15 +178,15 @@ const formatAssumptionVal = (val: unknown): string => {
         <div class="space-y-2 text-xs font-mono">
           <div class="flex items-center justify-between">
             <span class="text-gray-400">Conservativ (6%)</span>
-            <MoneyText :value="row.conservativeScenario" currency="RON" :places="2" class="font-bold" />
+            <MoneyText :value="row.annualConservative" currency="RON" :places="2" class="font-bold" />
           </div>
           <div class="flex items-center justify-between">
             <span class="text-gray-400">Moderat (8%)</span>
-            <MoneyText :value="row.moderateScenario" currency="RON" :places="2" class="font-bold" />
+            <MoneyText :value="row.annualModerate" currency="RON" :places="2" class="font-bold" />
           </div>
           <div v-if="hasHistoric" class="flex items-center justify-between border-t border-white/10 pt-1.5">
             <span class="text-gray-400">Historic CAGR</span>
-            <MoneyText :value="row.historicScenario" currency="RON" :places="2" class="font-bold text-emerald-400" />
+            <MoneyText :value="row.annualHistoric" currency="RON" :places="2" class="font-bold text-emerald-400" />
           </div>
         </div>
       </div>

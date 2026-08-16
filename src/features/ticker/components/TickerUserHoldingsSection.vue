@@ -184,7 +184,7 @@ const confirmDelete = async (tx: TransactionDto) => {
             <div class="text-[10px] text-gray-500 uppercase tracking-wider">Projected Value</div>
             <div class="text-sm font-bold text-purple-300"><MoneyText :value="r.value" :currency="currency" :places="2" :color="false" /></div>
           </div>
-          <div class="space-y-1">
+          <div v-if="parseFloat(String(r.dividendsReceived ?? '0')) > 0" class="space-y-1">
             <div class="text-[10px] text-gray-500 uppercase tracking-wider">Cum. Dividends</div>
             <div class="text-sm font-bold text-emerald-400">+<MoneyText :value="r.dividendsReceived" :currency="currency" :places="2" /></div>
           </div>

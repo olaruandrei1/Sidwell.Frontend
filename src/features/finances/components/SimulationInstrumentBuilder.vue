@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 import type { SimulationInstrumentConfig } from '../../../shared/api/types';
 import AppButton from '../../../shared/ui/atoms/AppButton.vue';
 import TickerSearchInput, { type TickerSearchResult } from '../../../shared/ui/molecules/TickerSearchInput.vue';

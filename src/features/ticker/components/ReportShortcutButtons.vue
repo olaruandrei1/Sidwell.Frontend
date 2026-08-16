@@ -47,27 +47,27 @@ async function download(format: ReportFormat) {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-2">
+  <div class="grid grid-cols-2 gap-2 w-full">
     <button
       type="button"
       :disabled="disabled || downloadingFormat !== null"
       :title="disabledReason"
-      class="flex-1 sm:flex-initial min-w-[140px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 sw-glass-card text-sm font-mono font-bold text-gray-200 hover:border-terminal-accent/50 hover:text-terminal-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-200 shadow-sm"
+      class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 sw-glass-card text-sm font-mono font-bold text-gray-200 hover:border-terminal-accent/50 hover:text-terminal-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-200 shadow-sm active:scale-[0.98]"
       @click="download('pdf')"
     >
       <span class="text-lg">📄</span>
-      <span>{{ downloadingFormat === 'pdf' ? 'Se generează…' : 'Descarcă PDF' }}</span>
+      <span class="truncate">{{ downloadingFormat === 'pdf' ? 'Se generează…' : 'Descarcă PDF' }}</span>
     </button>
 
     <button
       type="button"
       :disabled="disabled || downloadingFormat !== null"
       :title="disabledReason"
-      class="flex-1 sm:flex-initial min-w-[140px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 sw-glass-card text-sm font-mono font-bold text-gray-200 hover:border-terminal-accent/50 hover:text-terminal-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-200 shadow-sm"
+      class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 sw-glass-card text-sm font-mono font-bold text-gray-200 hover:border-terminal-accent/50 hover:text-terminal-accent transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-white/10 disabled:hover:text-gray-200 shadow-sm active:scale-[0.98]"
       @click="download('xlsx')"
     >
       <span class="text-lg">📊</span>
-      <span>{{ downloadingFormat === 'xlsx' ? 'Se generează…' : 'Descarcă XLSX' }}</span>
+      <span class="truncate">{{ downloadingFormat === 'xlsx' ? 'Se generează…' : 'Descarcă XLSX' }}</span>
     </button>
   </div>
 </template>

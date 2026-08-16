@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 import { useRoute } from 'vue-router';
 import AppNavbar from '../organisms/AppNavbar.vue';
 import PasskeySetupPrompt from '../../../features/auth/PasskeySetupPrompt.vue';

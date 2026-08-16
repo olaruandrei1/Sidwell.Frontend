@@ -515,7 +515,7 @@ const rangePercent = computed(() => {
     <!-- ── Verdict ─────────────────────────────────────────────────────────── -->
     <TickerVerdictCard v-if="!loadingDetail" :verdict="verdict" :is-loading="loadingVerdict" :is-error="verdictError" />
 
-    <div v-if="!loadingDetail" class="flex justify-end">
+    <div v-if="!loadingDetail" class="w-full sm:max-w-md sm:ml-auto">
       <ReportShortcutButtons :symbol="symbol" />
     </div>
 
@@ -801,7 +801,7 @@ const rangePercent = computed(() => {
     </div>
 
     <!-- ── Journal — note pages on the background; each page opens in a modal ── -->
-    <div v-if="!loadingDetail" class="pb-6 sm:pb-0">
+    <div v-if="!loadingDetail" class="pb-40 sm:pb-12">
       <TickerNotesSection :symbol="symbol" />
     </div>
 

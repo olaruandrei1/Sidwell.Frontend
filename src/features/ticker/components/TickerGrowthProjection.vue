@@ -26,6 +26,18 @@ const { data: projection, isLoading } = useGrowthProjectionQuery(
   computed(() => props.symbol),
   queryShares
 );
+
+function compactMoney(raw: string | number | undefined | null, currency: string): string {
+  if (raw === null || raw === undefined) return '—';
+  const v = typeof raw === 'number' ? raw : parseFloat(String(raw));
+  if (!Number.isFinite(v)) return '—';
+  const abs = Math.abs(v);
+  const short = abs >= 1e9 ? `${(v / 1e9).toFixed(2)}B`
+    : abs >= 1e6 ? `${(v / 1e6).toFixed(2)}M`
+    : abs >= 1e3 ? `${(v / 1e3).toFixed(2)}K`
+    : v.toFixed(2);
+  return `${short} ${currency}`;
+}
 </script>
 
 <template>
@@ -60,17 +72,24 @@ const { data: projection, isLoading } = useGrowthProjectionQuery(
           :key="sc.name"
           type="button"
           @click="selectedScenarioIndex = idx"
-          class="p-3 rounded-xl border text-left transition-all duration-200 btn-press"
+          class="px-3 py-3 rounded-xl border text-left transition-all duration-200 active:scale-[0.98] min-w-0"
           :class="[
             selectedScenarioIndex === idx
-              ? 'bg-terminal-accent/15 border-terminal-accent text-terminal-accent font-bold shadow-glow-accent/20'
-              : 'bg-white/5 border-white/10 text-gray-300 hover:border-white/30 hover:bg-white/10'
+              ? 'bg-terminal-accent/15 border-terminal-accent shadow-sm'
+              : 'bg-white/5 border-white/10 hover:border-white/25'
           ]"
         >
-          <div class="text-[10px] uppercase text-gray-400 font-bold tracking-wider">{{ sc.name }}</div>
-          <div class="text-base font-black mt-0.5 text-white">{{ sc.cagr }}% p.a.</div>
-          <div class="text-[10px] text-gray-400 mt-0.5">
-            {{ sc.rows[sc.rows.length - 1]?.value || '0' }} {{ currency || 'RON' }}
+          <div class="text-[9px] uppercase font-bold tracking-widest truncate"
+               :class="selectedScenarioIndex === idx ? 'text-terminal-accent' : 'text-gray-500'">
+            {{ sc.name }}
+          </div>
+          <div class="text-lg font-black mt-1 leading-none truncate"
+               :class="selectedScenarioIndex === idx ? 'text-terminal-accent' : 'text-white'">
+            {{ sc.cagr }}%
+          </div>
+          <div class="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">per year</div>
+          <div class="text-[11px] font-mono font-semibold text-gray-300 mt-2 pt-2 border-t border-white/5 truncate">
+            {{ compactMoney(sc.rows[sc.rows.length - 1]?.value, currency || 'RON') }}
           </div>
         </button>
       </div>

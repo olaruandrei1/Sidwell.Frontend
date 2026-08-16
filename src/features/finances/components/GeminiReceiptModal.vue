@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import AdaptiveOverlay from '../../../shared/ui/organisms/AdaptiveOverlay.vue';
 import AppButton from '../../../shared/ui/atoms/AppButton.vue';

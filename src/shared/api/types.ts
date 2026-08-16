@@ -181,9 +181,14 @@ export interface MyProjectionDto {
 
 export interface DividendScenarioRow {
   year: number;
-  conservativeScenario: Decimal;
-  moderateScenario: Decimal;
-  historicScenario: Decimal | null;
+  annualConservative: Decimal;
+  annualModerate: Decimal;
+  annualAggressive: Decimal;
+  annualHistoric: Decimal | null;
+  cumulativeConservative: Decimal;
+  cumulativeModerate: Decimal;
+  cumulativeAggressive: Decimal;
+  cumulativeHistoric: Decimal | null;
 }
 
 export interface DividendProjectionDto {

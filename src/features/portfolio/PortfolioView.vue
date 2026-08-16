@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { Trash2, RefreshCw, Plus } from 'lucide-vue-next';
+import { Trash2, RefreshCw, Plus } from '@lucide/vue';
 import { usePortfolioQuery, useDeletePositionMutation, useRecalcPositionMutation, useRecalcAllMutation } from '../../queries/usePortfolioQuery';
 import { usePortfolioStore } from '../../stores/portfolio';
 import { useToast } from '../../shared/composables/useToast';

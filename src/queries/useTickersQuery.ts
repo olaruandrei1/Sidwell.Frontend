@@ -35,16 +35,20 @@ function mapTechnicalVerdict(raw: TechnicalVerdictDto): TickerVerdictDto {
     caution: 'yellow',
     avoid: 'red'
   };
-  const reentryClause = raw.reentry
-    ? ` Historically, similar stretches on this ticker took ~${raw.reentry.estimatedDays} trading sessions to revert (based on ${raw.reentry.sampleCount} past episodes) — a mean-reversion target near $${raw.reentry.targetPrice.toFixed(2)}.`
-    : '';
+  const target = raw.reentry ? `$${raw.reentry.targetPrice.toFixed(2)}` : null;
+  const days = raw.reentry?.estimatedDays;
+  const sampleCount = raw.reentry?.sampleCount;
 
   const summaryByAction: Record<TechnicalVerdictDto['action'], string> = {
-    strong_buy: `${agreementPct}% of active signals point bullish, with strong conviction (${magnitudeConviction}%).`,
-    buy: `${agreementPct}% of active signals point bullish (${magnitudeConviction}% conviction).`,
-    hold: 'Signals are mixed right now — no clear directional edge.',
-    caution: `${agreementPct}% of active signals lean bearish (${magnitudeConviction}% conviction) — consider waiting for a better entry.${reentryClause}`,
-    avoid: `${agreementPct}% of active signals point bearish, with strong conviction (${magnitudeConviction}%) — elevated risk.${reentryClause}`
+    strong_buy: `${magnitudeConviction}% conviction long: ${agreementPct}% of active signals point up strongly. Hold them — or open a long position (CFDs) if you're not in yet.`,
+    buy: `${magnitudeConviction}% conviction long: ${agreementPct}% of active signals lean bullish. Reasonable to add on strength or hold.`,
+    hold: `Signals are mixed — no clear edge either way (${magnitudeConviction}% conviction). Hold them boy: don't chase, don't dump.`,
+    caution: target
+      ? `${magnitudeConviction}% conviction short: ${agreementPct}% of signals lean bearish. Consider trimming and waiting to re-enter near ${target} (historical revert took ~${days} sessions across ${sampleCount} similar episodes).`
+      : `${magnitudeConviction}% conviction short: ${agreementPct}% of signals lean bearish (${magnitudeConviction}% conviction). Consider trimming and waiting for a better entry.`,
+    avoid: target
+      ? `${magnitudeConviction}% conviction short: strong bearish agreement (${agreementPct}%). Sell and wait to re-enter near ${target} — or open a short (CFDs) if that's your play. Historical mean-revert: ~${days} sessions across ${sampleCount} episodes.`
+      : `${magnitudeConviction}% conviction short: strong bearish agreement (${agreementPct}%). Sell and wait for a better entry — or open a short (CFDs) if that's your play.`
   };
 
   const reentry = raw.reentry

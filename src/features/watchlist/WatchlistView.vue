@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { X } from 'lucide-vue-next';
+import { X } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import {
   useWatchlistQuery,

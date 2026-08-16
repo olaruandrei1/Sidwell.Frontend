@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Check } from 'lucide-vue-next';
+import { Check } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import { api } from '../../shared/api/client';
 import { useToast } from '../../shared/composables/useToast';

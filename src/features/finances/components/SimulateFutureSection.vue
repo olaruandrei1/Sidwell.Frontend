@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { X, Pencil } from 'lucide-vue-next';
+import { X, Pencil } from '@lucide/vue';
 import { useI18n } from 'vue-i18n';
 import AppButton from '../../../shared/ui/atoms/AppButton.vue';
 import AppInput from '../../../shared/ui/atoms/AppInput.vue';
