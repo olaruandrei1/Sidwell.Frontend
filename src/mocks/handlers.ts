@@ -596,7 +596,8 @@ export const handlers = [
       summary: 'Solid balance sheet, strong cash flows, and attractive margin of safety relative to valuation models.',
       riskWorthIt: true,
       probabilisticWin: 78,
-      coloring: 'green'
+      coloring: 'green',
+      reentry: null
     };
     return HttpResponse.json(verdict);
   }),

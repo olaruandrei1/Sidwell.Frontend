@@ -11,8 +11,67 @@ import type {
   PaginatedResult,
   NewsItem,
   TickerVerdictDto,
+  TechnicalVerdictDto,
   AlgoMetadataDto
 } from '../shared/api/types';
+
+const VERDICT_INDICATOR_TYPES = 'sma20,sma50,rsi14,macd,adx14';
+
+function mapTechnicalVerdict(raw: TechnicalVerdictDto): TickerVerdictDto {
+  const magnitudeConviction = Math.round(50 + Math.abs(raw.rawScore) * 50);
+  const agreementPct = Math.round(raw.agreementPct);
+
+  const verdictByAction: Record<TechnicalVerdictDto['action'], TickerVerdictDto['verdict']> = {
+    strong_buy: 'buy',
+    buy: 'buy',
+    hold: 'hold',
+    caution: 'risky',
+    avoid: 'avoid'
+  };
+  const coloringByAction: Record<TechnicalVerdictDto['action'], TickerVerdictDto['coloring']> = {
+    strong_buy: 'green',
+    buy: 'green',
+    hold: 'yellow',
+    caution: 'yellow',
+    avoid: 'red'
+  };
+  const reentryClause = raw.reentry
+    ? ` Historically, similar stretches on this ticker took ~${raw.reentry.estimatedDays} trading sessions to revert (based on ${raw.reentry.sampleCount} past episodes) — a mean-reversion target near $${raw.reentry.targetPrice.toFixed(2)}.`
+    : '';
+
+  const summaryByAction: Record<TechnicalVerdictDto['action'], string> = {
+    strong_buy: `${agreementPct}% of active signals point bullish, with strong conviction (${magnitudeConviction}%).`,
+    buy: `${agreementPct}% of active signals point bullish (${magnitudeConviction}% conviction).`,
+    hold: 'Signals are mixed right now — no clear directional edge.',
+    caution: `${agreementPct}% of active signals lean bearish (${magnitudeConviction}% conviction) — consider waiting for a better entry.${reentryClause}`,
+    avoid: `${agreementPct}% of active signals point bearish, with strong conviction (${magnitudeConviction}%) — elevated risk.${reentryClause}`
+  };
+
+  const reentry = raw.reentry
+    ? {
+        estimatedDays: raw.reentry.estimatedDays,
+        sampleCount: raw.reentry.sampleCount,
+        targetPrice: raw.reentry.targetPrice,
+        estimatedDate: estimateCalendarDate(raw.reentry.estimatedDays)
+      }
+    : null;
+
+  return {
+    verdict: verdictByAction[raw.action],
+    summary: summaryByAction[raw.action],
+    riskWorthIt: raw.action !== 'hold' && magnitudeConviction >= 65 && agreementPct >= 60,
+    probabilisticWin: magnitudeConviction,
+    coloring: coloringByAction[raw.action],
+    reentry
+  };
+}
+
+function estimateCalendarDate(tradingDays: number): string {
+  const calendarDays = Math.round(tradingDays * (7 / 5));
+  const date = new Date();
+  date.setDate(date.getDate() + calendarDays);
+  return date.toISOString().slice(0, 10);
+}
 
 export function useTickerDetailQuery(symbol: Ref<string> | string) {
   return useQuery({
@@ -83,8 +142,13 @@ export function useTickerNewsPaginatedQuery(
 
 export function useTickerVerdictQuery(symbol: Ref<string> | string) {
   return useQuery({
-    queryKey: ['ticker-verdict', symbol],
-    queryFn: () => api.post<TickerVerdictDto>(`/tickers/${unref(symbol)}/verdict`, {}),
+    queryKey: ['ticker-verdict-technical', symbol],
+    queryFn: async () => {
+      const raw = await api.get<TechnicalVerdictDto>(`/tickers/${unref(symbol)}/verdict`, {
+        params: { types: VERDICT_INDICATOR_TYPES }
+      });
+      return mapTechnicalVerdict(raw);
+    },
     staleTime: 5 * 60 * 1000,
     retry: 0
   });

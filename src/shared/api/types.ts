@@ -11,6 +11,34 @@ export interface PriceBar {
   volume: number;
 }
 
+export interface IndicatorPointDto {
+  date: string;
+  values: Record<string, number>;
+}
+
+export interface IndicatorSeriesDto {
+  type: string;
+  params: Record<string, number>;
+  points: IndicatorPointDto[];
+  trend: string | null;
+  error: string | null;
+}
+
+export interface ReentryEstimateDto {
+  estimatedDays: number;
+  sampleCount: number;
+  targetPrice: number;
+  currentDeviationPct: number;
+}
+
+export interface TechnicalVerdictDto {
+  rawScore: number;
+  convictionPct: number;
+  action: 'strong_buy' | 'buy' | 'hold' | 'caution' | 'avoid';
+  agreementPct: number;
+  reentry: ReentryEstimateDto | null;
+}
+
 export interface CompositeScore {
   philosophy: Philosophy;
   score: Decimal;
@@ -32,12 +60,20 @@ export interface AlgoMetadataDto {
   how: string;
 }
 
+export interface TickerVerdictReentry {
+  estimatedDays: number;
+  sampleCount: number;
+  targetPrice: number;
+  estimatedDate: string;
+}
+
 export interface TickerVerdictDto {
   verdict: "buy" | "hold" | "risky" | "avoid";
   summary: string;
   riskWorthIt: boolean;
   probabilisticWin: number | null;
   coloring: "green" | "yellow" | "red";
+  reentry: TickerVerdictReentry | null;
 }
 
 export interface GatedAlgoDto {

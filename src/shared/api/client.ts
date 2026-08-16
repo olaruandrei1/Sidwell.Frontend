@@ -149,6 +149,38 @@ export async function request<T>(endpoint: string, options: RequestOptions = {})
   }
 }
 
+export interface BlobResponse {
+  blob: Blob;
+  fileName: string;
+}
+
+/** POST a JSON body and return the raw binary response (file downloads: PDF/XLSX exports). */
+async function postBlob(endpoint: string, body: unknown): Promise<BlobResponse> {
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
+
+  const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+
+  if (!response.ok) {
+    let message = response.statusText || `Request failed with status ${response.status}`;
+    try {
+      const errBody = await response.clone().json();
+      if (errBody?.message) message = errBody.message;
+    } catch { /* ignore */ }
+    const apiErr: ApiError = { status: response.status, code: `HTTP_${response.status}`, message };
+    throw apiErr;
+  }
+
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const fileName = match?.[1] ?? 'download';
+
+  return { blob: await response.blob(), fileName };
+}
+
 export const api = {
   get: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: 'GET' }),
@@ -161,4 +193,6 @@ export const api = {
   /** POST multipart/form-data — for file uploads (receipt scan, etc.) */
   postForm: <T>(endpoint: string, formData: FormData, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: 'POST', body: formData, multipart: true }),
+  /** POST JSON, receive a binary file (PDF/XLSX exports). */
+  postBlob,
 };

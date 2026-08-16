@@ -518,7 +518,7 @@ const rangePercent = computed(() => {
     <div v-if="!loadingDetail" class="flex flex-wrap w-full gap-6 items-start">
       <!-- Price Chart -->
       <div class="flex-1 min-w-[340px] max-w-full w-full">
-        <PriceChart :bars="detail?.price.history || []" :height="360" />
+        <PriceChart :bars="detail?.price.history || []" :height="360" :symbol="symbol" />
       </div>
 
       <!-- Algorithms — title on background, score-bar cards (tap for detail) -->

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { useAuthStore } from '../../../stores/auth';
 import { useToast } from '../../../shared/composables/useToast';
+import { api } from '../../../shared/api/client';
 import AppButton from '../../../shared/ui/atoms/AppButton.vue';
 import AdaptiveOverlay from '../../../shared/ui/organisms/AdaptiveOverlay.vue';
 import {
@@ -136,7 +137,7 @@ async function handleDelete(id: string) {
   }
 }
 
-// ── share via mailto ─────────────────────────────────────────────────────────
+// ── share: notes-only mailto, or full report download ───────────────────────
 function senderName(): string {
   const user = auth.user;
   if (user?.displayName) return user.displayName;
@@ -144,7 +145,7 @@ function senderName(): string {
   const local = user.email.split('@')[0] ?? '';
   return local.split(/[._\-,]+/).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 }
-function shareNote(note: TickerNoteDto) {
+function sendNotesOnly(note: TickerNoteDto) {
   const lines: string[] = [`${note.title}`, `${props.symbol} — Research Note`, ''];
   note.sections.forEach((s, i) => {
     if (s.content.trim()) {
@@ -157,6 +158,68 @@ function shareNote(note: TickerNoteDto) {
   }
   lines.push('', '──────────────────────────────', senderName(), 'Report generated from Sidwell — Trading & Financial Cockpit');
   window.location.href = `mailto:?subject=${encodeURIComponent(`${note.title} — ${props.symbol}`)}&body=${encodeURIComponent(lines.join('\n'))}`;
+  isShareModalOpen.value = false;
+}
+
+type ShareStep = 'choice' | 'format';
+const isShareModalOpen = ref(false);
+const shareStep = ref<ShareStep>('choice');
+const includeAttachmentsInReport = ref(true);
+type ReportFormat = 'pdf' | 'xlsx';
+const downloadingFormat = ref<ReportFormat | null>(null);
+
+function openShareModal() {
+  shareStep.value = 'choice';
+  includeAttachmentsInReport.value = true;
+  isShareModalOpen.value = true;
+}
+
+async function downloadReport(format: ReportFormat) {
+  const note = activeNote.value;
+  if (!note) return;
+  downloadingFormat.value = format;
+  try {
+    const { blob, fileName } = await api.postBlob(`/tickers/${encodeURIComponent(props.symbol)}/notes/${note.id}/report`, {
+      format,
+      includeAttachments: includeAttachmentsInReport.value,
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    isShareModalOpen.value = false;
+  } catch {
+    toast.error('Eroare', 'Nu s-a putut genera raportul.');
+  } finally {
+    downloadingFormat.value = null;
+  }
+}
+
+// ── attachment preview ───────────────────────────────────────────────────────
+const previewedAttachment = ref<TickerNoteAttachmentDto | null>(null);
+const isPreviewOpen = ref(false);
+
+function attachmentDataUri(att: TickerNoteAttachmentDto): string {
+  return `data:${att.mimeType};base64,${att.dataBase64}`;
+}
+function isPreviewable(mime: string): boolean {
+  return mime.startsWith('image/') || mime === 'application/pdf';
+}
+function openAttachmentPreview(att: TickerNoteAttachmentDto) {
+  previewedAttachment.value = att;
+  isPreviewOpen.value = true;
+}
+function downloadAttachment(att: TickerNoteAttachmentDto) {
+  const link = document.createElement('a');
+  link.href = attachmentDataUri(att);
+  link.download = att.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -234,6 +297,19 @@ function fileIcon(mime: string): string {
         <div v-if="activeNote.attachments.length" class="flex flex-wrap gap-2">
           <span v-for="att in activeNote.attachments" :key="att.id" class="text-xs font-mono px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-300 flex items-center gap-1.5">
             {{ fileIcon(att.mimeType) }} {{ att.name }}
+            <button
+              v-if="isPreviewable(att.mimeType)"
+              type="button"
+              class="text-gray-500 hover:text-sky-300 transition-colors"
+              title="Previzualizează"
+              @click="openAttachmentPreview(att)"
+            >👁</button>
+            <button
+              type="button"
+              class="text-gray-500 hover:text-terminal-accent transition-colors"
+              title="Descarcă"
+              @click="downloadAttachment(att)"
+            >⇩</button>
           </span>
         </div>
         <div class="text-[11px] text-gray-600 font-mono">{{ formatDate(activeNote.createdAt) }}</div>
@@ -284,13 +360,86 @@ function fileIcon(mime: string): string {
       <template #actions>
         <template v-if="mode === 'view' && activeNote">
           <button type="button" class="px-4 py-2 text-sm font-mono font-bold text-gray-300 rounded-xl border border-white/15 bg-white/5 hover:border-rose-400/40 hover:text-rose-300 transition-colors" @click="handleDelete(activeNote.id)">🗑 Șterge</button>
-          <button type="button" class="px-4 py-2 text-sm font-mono font-bold text-gray-300 rounded-xl border border-white/15 bg-white/5 hover:border-sky-400/40 hover:text-sky-300 transition-colors" @click="shareNote(activeNote)">✉ Share</button>
+          <button type="button" class="px-4 py-2 text-sm font-mono font-bold text-gray-300 rounded-xl border border-white/15 bg-white/5 hover:border-sky-400/40 hover:text-sky-300 transition-colors" @click="openShareModal">✉ Share</button>
           <AppButton variant="primary" size="sm" @click="startEdit">✎ Editează</AppButton>
         </template>
         <template v-else>
           <button type="button" class="px-4 py-2 text-sm font-mono font-bold text-gray-400 rounded-xl border border-white/15 bg-white/5 hover:text-gray-200 transition-colors" @click="isModalOpen = false">Anulează</button>
           <AppButton variant="primary" size="sm" :loading="isSaving" @click="handleSave">Salvează</AppButton>
         </template>
+      </template>
+    </AdaptiveOverlay>
+
+    <!-- ── Share modal: decision tree ────────────────────────────────────── -->
+    <AdaptiveOverlay v-model="isShareModalOpen" title="Share notă" :max-width="440">
+      <div v-if="shareStep === 'choice' && activeNote" class="space-y-3">
+        <button
+          type="button"
+          class="w-full text-left p-4 rounded-xl border border-white/10 bg-white/5 hover:border-sky-400/40 transition-colors"
+          @click="sendNotesOnly(activeNote)"
+        >
+          <div class="text-sm font-mono font-bold text-gray-100">✉ Trimite doar notițele</div>
+          <div class="text-xs text-gray-500 mt-1">Deschide clientul de mail cu textul notei (fără atașamente).</div>
+        </button>
+        <button
+          type="button"
+          class="w-full text-left p-4 rounded-xl border border-white/10 bg-white/5 hover:border-terminal-accent/40 transition-colors"
+          @click="shareStep = 'format'"
+        >
+          <div class="text-sm font-mono font-bold text-gray-100">⬇ Descarcă raportul complet</div>
+          <div class="text-xs text-gray-500 mt-1">Generează un fișier stilizat cu toată nota (și, opțional, atașamentele).</div>
+        </button>
+      </div>
+
+      <div v-else-if="shareStep === 'format' && activeNote" class="space-y-4">
+        <label
+          v-if="activeNote.attachments.length"
+          class="flex items-center gap-2.5 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer"
+        >
+          <input type="checkbox" v-model="includeAttachmentsInReport" class="accent-terminal-accent w-4 h-4" />
+          <span class="text-sm text-gray-200">Include atașamentele în raport ({{ activeNote.attachments.length }})</span>
+        </label>
+
+        <button
+          type="button"
+          :disabled="downloadingFormat !== null"
+          class="w-full flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5 hover:border-terminal-accent/40 transition-colors disabled:opacity-50"
+          @click="downloadReport('pdf')"
+        >
+          <span class="text-sm font-mono font-bold text-gray-100">📄 PDF</span>
+          <span class="text-xs text-gray-500">{{ downloadingFormat === 'pdf' ? 'Se generează...' : 'Descarcă' }}</span>
+        </button>
+
+        <button
+          type="button"
+          :disabled="downloadingFormat !== null"
+          class="w-full flex items-center justify-between p-4 rounded-xl border border-white/10 bg-white/5 hover:border-terminal-accent/40 transition-colors disabled:opacity-50"
+          @click="downloadReport('xlsx')"
+        >
+          <span class="text-sm font-mono font-bold text-gray-100">📊 XLSX</span>
+          <span class="text-xs text-gray-500">{{ downloadingFormat === 'xlsx' ? 'Se generează...' : 'Descarcă' }}</span>
+        </button>
+
+        <button type="button" class="text-xs text-gray-500 hover:text-gray-300 transition-colors" @click="shareStep = 'choice'">
+          ← Înapoi
+        </button>
+      </div>
+    </AdaptiveOverlay>
+
+    <!-- ── Attachment preview modal ──────────────────────────────────────── -->
+    <AdaptiveOverlay v-model="isPreviewOpen" :title="previewedAttachment?.name || 'Atașament'" :max-width="720">
+      <div v-if="previewedAttachment" class="space-y-3">
+        <iframe
+          :src="attachmentDataUri(previewedAttachment)"
+          class="w-full h-[70vh] rounded-xl border border-white/10 bg-white"
+        />
+      </div>
+      <template #actions>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-mono font-bold text-gray-300 rounded-xl border border-white/15 bg-white/5 hover:border-terminal-accent/40 hover:text-terminal-accent transition-colors"
+          @click="previewedAttachment && downloadAttachment(previewedAttachment)"
+        >⇩ Descarcă</button>
       </template>
     </AdaptiveOverlay>
   </div>
