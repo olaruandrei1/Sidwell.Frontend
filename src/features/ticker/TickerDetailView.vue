@@ -340,61 +340,66 @@ onUnmounted(() => {
         Loading ticker data...
       </div>
 
-      <!-- Price + gauge, centered on the background -->
-      <div v-else class="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-10 pt-2">
+      <!-- Price + gauge, centered on the background. Desktop: Price + Philosophy stacked in a
+           left column, chart takes the wider remaining space on the right. Mobile: Price, then
+           Philosophy, stacked centered (the chart renders separately, further down the page). -->
+      <div v-else class="flex flex-col lg:flex-row items-center lg:items-stretch justify-center gap-8 lg:gap-10 pt-2">
 
-        <!-- Price -->
-        <div class="flex flex-col items-center lg:items-start gap-3 lg:shrink-0">
-          <div class="text-center lg:text-left">
-            <div class="flex items-baseline gap-2 justify-center lg:justify-start">
-              <span
-                class="text-5xl lg:text-6xl font-black font-mono text-gray-50 tabular-nums leading-none transition-colors duration-500"
-                :class="priceJustUpdated ? 'sw-fresh-pulse' : ''"
-              >
-                {{ latestClose != null ? latestClose.toFixed(2) : 'N/A' }}
-              </span>
-              <span class="text-base lg:text-lg text-gray-500 font-mono">{{ detail?.ticker.currency }}</span>
+        <!-- Left column (desktop) / stacked block (mobile): Price on top, Philosophy below -->
+        <div class="flex flex-col items-center lg:items-start gap-8 lg:shrink-0 lg:w-[320px] lg:justify-center">
+          <!-- Price -->
+          <div class="flex flex-col items-center lg:items-start gap-3 w-full">
+            <div class="text-center lg:text-left">
+              <div class="flex items-baseline gap-2 justify-center lg:justify-start">
+                <span
+                  class="text-5xl lg:text-6xl font-black font-mono text-gray-50 tabular-nums leading-none transition-colors duration-500"
+                  :class="priceJustUpdated ? 'sw-fresh-pulse' : ''"
+                >
+                  {{ latestClose != null ? latestClose.toFixed(2) : 'N/A' }}
+                </span>
+                <span class="text-base lg:text-lg text-gray-500 font-mono">{{ detail?.ticker.currency }}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-2 justify-center lg:justify-start">
+                <span
+                  class="text-base lg:text-lg font-bold font-mono tabular-nums"
+                  :class="dayChange >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+                >
+                  {{ dayChange >= 0 ? '+' : '' }}{{ dayChange.toFixed(2) }}
+                  <span class="text-sm lg:text-base opacity-80">({{ dayChange >= 0 ? '+' : '' }}{{ dayChangePct.toFixed(2) }}%)</span>
+                </span>
+                <span class="text-[10px] text-gray-600 font-mono uppercase tracking-wider">vs prev close</span>
+              </div>
             </div>
-            <div class="flex items-center gap-2 mt-2 justify-center lg:justify-start">
-              <span
-                class="text-base lg:text-lg font-bold font-mono tabular-nums"
-                :class="dayChange >= 0 ? 'text-emerald-400' : 'text-rose-400'"
-              >
-                {{ dayChange >= 0 ? '+' : '' }}{{ dayChange.toFixed(2) }}
-                <span class="text-sm lg:text-base opacity-80">({{ dayChange >= 0 ? '+' : '' }}{{ dayChangePct.toFixed(2) }}%)</span>
-              </span>
-              <span class="text-[10px] text-gray-600 font-mono uppercase tracking-wider">vs prev close</span>
+
+            <!-- 52W range bar -->
+            <div v-if="detail?.keyStats?.fiftyTwoWeekLow && detail?.keyStats?.fiftyTwoWeekHigh" class="space-y-1.5 w-full max-w-[340px] lg:max-w-none">
+              <div class="relative h-2.5 bg-white/15 rounded-full border border-white/10 shadow-inner">
+                <div
+                  class="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-terminal-accent/40 to-terminal-accent"
+                  :style="{ width: rangePercent + '%' }"
+                />
+                <div
+                  class="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-terminal-accent border-2 border-terminal-bg shadow-glow-accent ring-1 ring-terminal-accent/60"
+                  :style="{ left: 'calc(' + rangePercent + '% - 7px)', transform: 'translateY(-50%)' }"
+                />
+              </div>
+              <div class="flex items-center justify-between text-[10px] font-mono text-gray-500">
+                <span>{{ formatStat(detail.keyStats.fiftyTwoWeekLow, '', 2) }} <span class="text-gray-600">LOW</span></span>
+                <span class="text-gray-600">52W RANGE</span>
+                <span><span class="text-gray-600">HIGH</span> {{ formatStat(detail.keyStats.fiftyTwoWeekHigh, '', 2) }}</span>
+              </div>
             </div>
           </div>
 
-          <!-- 52W range bar -->
-          <div v-if="detail?.keyStats?.fiftyTwoWeekLow && detail?.keyStats?.fiftyTwoWeekHigh" class="space-y-1.5 w-full max-w-[340px] lg:max-w-[380px]">
-            <div class="relative h-2.5 bg-white/15 rounded-full border border-white/10 shadow-inner">
-              <div
-                class="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-terminal-accent/40 to-terminal-accent"
-                :style="{ width: rangePercent + '%' }"
-              />
-              <div
-                class="absolute top-1/2 w-3.5 h-3.5 rounded-full bg-terminal-accent border-2 border-terminal-bg shadow-glow-accent ring-1 ring-terminal-accent/60"
-                :style="{ left: 'calc(' + rangePercent + '% - 7px)', transform: 'translateY(-50%)' }"
-              />
-            </div>
-            <div class="flex items-center justify-between text-[10px] font-mono text-gray-500">
-              <span>{{ formatStat(detail.keyStats.fiftyTwoWeekLow, '', 2) }} <span class="text-gray-600">LOW</span></span>
-              <span class="text-gray-600">52W RANGE</span>
-              <span><span class="text-gray-600">HIGH</span> {{ formatStat(detail.keyStats.fiftyTwoWeekHigh, '', 2) }}</span>
-            </div>
+          <!-- Composite Gauge (de-carded) -->
+          <div class="flex-shrink-0 w-full max-w-[300px] lg:max-w-none">
+            <CompositeGauge :composite="detail?.composite || null" size="lg" />
           </div>
         </div>
 
-        <!-- Chart in between price and composite on desktop only -->
+        <!-- Chart, wider, on the right (desktop only — mobile chart renders further down the page) -->
         <div v-if="isLgUp" class="flex-1 min-w-0">
-          <PriceChart :bars="detail?.price.history || []" :height="320" :symbol="symbol" :currency="detail?.ticker.currency || 'USD'" />
-        </div>
-
-        <!-- Composite Gauge (de-carded) -->
-        <div class="flex-shrink-0 w-full max-w-[300px] lg:max-w-[340px]">
-          <CompositeGauge :composite="detail?.composite || null" size="lg" />
+          <PriceChart :bars="detail?.price.history || []" :height="480" :symbol="symbol" :currency="detail?.ticker.currency || 'USD'" />
         </div>
       </div>
     </div>

@@ -39,6 +39,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../features/ticker/TickerDetailView.vue')
   },
   {
+    path: '/ticker/:symbol/chart',
+    name: 'ticker-chart',
+    component: () => import('../features/ticker/TickerChartView.vue')
+  },
+  {
     path: '/settings',
     name: 'settings',
     component: () => import('../features/settings/SettingsView.vue')

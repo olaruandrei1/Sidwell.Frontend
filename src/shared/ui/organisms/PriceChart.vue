@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, shallowRef } from 'vue';
+import { useRouter } from 'vue-router';
+import { useBreakpoint } from '../../composables/useBreakpoint';
 import { use } from 'echarts/core';
 import VChart, { THEME_KEY } from 'vue-echarts';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -18,6 +20,7 @@ import type { PriceBar, IndicatorSeriesDto, IndicatorPointDto } from '../../api/
 import { useTickerIndicatorsQuery } from '../../../queries/useTickerIndicatorsQuery';
 import { useThemeStore } from '../../../stores/theme';
 import IndicatorAnalysisPanel from './IndicatorAnalysisPanel.vue';
+import IndicatorRecommendationCards from './IndicatorRecommendationCards.vue';
 import AdaptiveOverlay from './AdaptiveOverlay.vue';
 
 use([
@@ -78,10 +81,12 @@ const palette = computed(() => {
 });
 
 // ── period filter ────────────────────────────────────────────────────────
-type Period = '1Y' | '3Y' | '5Y';
+// Bars are daily OHLC (no intraday granularity), so "1D"/"5D" just show the most recent
+// 1/5 trading-day candles rather than an intraday minute chart.
+type Period = '1D' | '5D' | '1M' | '6M' | '1Y' | '3Y' | '5Y';
 const selectedPeriod = ref<Period>('1Y');
-const periods: Period[] = ['1Y', '3Y', '5Y'];
-const cutoffDays: Record<Period, number> = { '1Y': 365, '3Y': 1095, '5Y': 1825 };
+const periods: Period[] = ['1D', '5D', '1M', '6M', '1Y', '3Y', '5Y'];
+const cutoffDays: Record<Period, number> = { '1D': 1, '5D': 5, '1M': 30, '6M': 182, '1Y': 365, '3Y': 1095, '5Y': 1825 };
 
 const filteredBars = computed(() => {
   const cutoff = new Date();
@@ -209,8 +214,11 @@ const chartOption = computed<EChartsOption>(() => {
 
   const paneList = panes.value;
   const grids = paneList.map((pane) => ({
-    left: 8,
-    right: 52,
+    // containLabel stays false so all panes' x-axis categories line up pixel-for-pixel (only the
+    // bottom pane shows labels) — left/right are wide enough to fully contain the first/last
+    // category label's text instead of letting it get clipped at the chart's edge.
+    left: 40,
+    right: 56,
     top: pane.top,
     height: pane.height,
     borderColor: p.axisLine,
@@ -369,8 +377,18 @@ const chartOption = computed<EChartsOption>(() => {
 // ── fullscreen (mobile landscape) ───────────────────────────────────────
 const isFullscreen = ref(false);
 const chartWrapper = ref<HTMLElement | null>(null);
+const router = useRouter();
+const { isMobile } = useBreakpoint();
 
 async function toggleFullscreen() {
+  // Mobile: CSS/Fullscreen-API "fullscreen" on the small inline chart is cramped and fiddly to use
+  // one-handed — send mobile users to the dedicated landscape chart page instead, which has the
+  // whole viewport and is built for horizontal use.
+  if (isMobile.value) {
+    router.push({ name: 'ticker-chart', params: { symbol: props.symbol } });
+    return;
+  }
+
   const el = chartWrapper.value;
   if (!el) return;
   const anyEl = el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
@@ -431,7 +449,7 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
   <div
     ref="chartWrapper"
     class="w-full border border-white/10 rounded-3xl overflow-hidden sw-glass-card p-3 sm:p-4 shadow-lg select-none relative"
-    :class="isFullscreen ? 'bg-terminal-bg h-screen w-screen fixed inset-0 z-50 flex flex-col' : ''"
+    :class="isFullscreen ? 'bg-terminal-bg h-screen w-screen fixed inset-0 z-50 flex flex-col overflow-y-auto' : ''"
   >
     <!-- Price band (centered) -->
     <div class="flex flex-col items-center pb-2 leading-tight">
@@ -462,11 +480,11 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
 
       <div class="flex-1" />
 
-      <div class="shrink-0 flex items-center bg-terminal-bg/60 border border-white/10 rounded-lg p-0.5">
+      <div class="shrink-0 flex items-center bg-terminal-bg/60 border border-white/10 rounded-lg p-0.5 max-w-[220px] sm:max-w-none overflow-x-auto scrollbar-none">
         <button
           v-for="p in periods"
           :key="p"
-          class="min-w-[30px] h-7 px-1.5 text-[10px] font-mono font-bold rounded-md transition-all duration-150"
+          class="shrink-0 min-w-[26px] h-7 px-1 text-[10px] font-mono font-bold rounded-md transition-all duration-150"
           :class="selectedPeriod === p
             ? 'bg-terminal-accent/20 text-terminal-accent shadow-sm'
             : 'text-gray-400 hover:text-gray-200'"
@@ -557,7 +575,7 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
       </template>
     </AdaptiveOverlay>
 
-    <div :class="isFullscreen ? 'flex-1 relative' : 'relative'">
+    <div :class="isFullscreen ? 'flex-1 relative min-h-[360px]' : 'relative'">
       <VChart
         ref="chartRef"
         :option="chartOption"
@@ -565,6 +583,15 @@ watch(themeStore, () => { setTimeout(() => chartRef.value?.resize(), 30); });
         :style="isFullscreen ? { width: '100%', height: '100%' } : { width: '100%', height: `${chartHeight}px` }"
       />
     </div>
+
+    <!-- Recommendation cards for each active indicator, right below the chart -->
+    <IndicatorRecommendationCards
+      v-if="activeIndicators.length > 0"
+      :indicators="activeIndicators"
+      :dtos="indicatorData ?? []"
+      class="mt-3"
+      @open="(key) => { const def = activeIndicators.find((i) => i.key === key); if (def) openAnalysis(def); }"
+    />
 
     <IndicatorAnalysisPanel
       v-if="activePanel"
