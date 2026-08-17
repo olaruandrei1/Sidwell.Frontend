@@ -57,7 +57,8 @@ export const mockFinanceSettings: FinanceSettingsDto = {
   },
   categories: [...defaultFinanceCategories],
   banks: [...defaultBanks],
-  brokers: [...defaultBrokers]
+  brokers: [...defaultBrokers],
+  categoryTypes: []
 };
 
 export const mockExpenses: ExpenseItemDto[] = [

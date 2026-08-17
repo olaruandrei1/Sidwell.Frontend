@@ -42,6 +42,17 @@ const formattedScore = computed(() => {
 
 // Position of the score on the -100..+100 scale bar (as a percentage).
 const markerPct = computed(() => ((scoreNum.value + 100) / 200) * 100);
+
+const dims = computed(() => {
+  switch (props.size) {
+    case 'sm':
+      return { arc: 'w-48 h-28', score: 'text-2xl sm:text-3xl', bar: 'w-40' };
+    case 'lg':
+      return { arc: 'w-80 h-48', score: 'text-5xl sm:text-6xl', bar: 'w-72' };
+    default:
+      return { arc: 'w-64 h-40', score: 'text-4xl sm:text-5xl', bar: 'w-56' };
+  }
+});
 </script>
 
 <template>
@@ -55,7 +66,7 @@ const markerPct = computed(() => ((scoreNum.value + 100) / 200) * 100);
     </div>
 
     <!-- Semicircular Speedometer Arc -->
-    <div class="relative flex flex-col items-center justify-center w-64 h-40">
+    <div class="relative flex flex-col items-center justify-center" :class="dims.arc">
       <svg class="w-full h-full overflow-visible" viewBox="0 0 200 120">
         <!-- Background Track (-100 to +100 arc) -->
         <path
@@ -82,7 +93,8 @@ const markerPct = computed(() => ((scoreNum.value + 100) / 200) * 100);
       <!-- Center Score & Label -->
       <div class="absolute bottom-3 flex flex-col items-center text-center">
         <span
-          class="font-mono font-extrabold text-4xl sm:text-5xl tabular-nums tracking-tight leading-none"
+          class="font-mono font-extrabold tabular-nums tracking-tight leading-none"
+          :class="dims.score"
           :style="{ color: gaugeColor, textShadow: `0 0 24px ${gaugeColor}55` }"
         >
           {{ formattedScore }}
@@ -94,7 +106,7 @@ const markerPct = computed(() => ((scoreNum.value + 100) / 200) * 100);
     </div>
 
     <!-- Distinct colored scale bar (-100 → +100) with a marker at the score -->
-    <div class="w-56 max-w-full mt-1">
+    <div class="max-w-full mt-1" :class="dims.bar">
       <div class="relative h-2.5 rounded-full overflow-hidden border border-white/10" style="background: linear-gradient(90deg, #ef4444 0%, #f59e0b 35%, #eab308 50%, #34d399 70%, #10b981 100%);">
       </div>
       <div class="relative h-0">

@@ -1,4 +1,4 @@
-import type { SettingsDto, DividendTaxRateDto, NotificationDto, ScreenerPreset } from '../../shared/api/types';
+import type { SettingsDto, DividendTaxRateDto, NotificationDto } from '../../shared/api/types';
 
 export const mockSettings: SettingsDto = {
   philosophy: 'BALANCED',
@@ -56,18 +56,5 @@ export const mockNotifications: NotificationDto[] = [
     body: 'TLV.RO dropped 1.5% below your 28.50 RON target.',
     isRead: false,
     createdAt: '2026-07-25T16:45:00Z'
-  }
-];
-
-export const mockScreenerPresets: ScreenerPreset[] = [
-  {
-    id: 'preset-1',
-    name: 'BVB High Dividend Yield',
-    criteria: { minYield: '6.00', maxPe: '12.00', exchange: 'BVB' }
-  },
-  {
-    id: 'preset-2',
-    name: 'Safe Value (Piotroski ≥ 7, Safe Altman)',
-    criteria: { minPiotroski: 7, altmanSafe: true }
   }
 ];

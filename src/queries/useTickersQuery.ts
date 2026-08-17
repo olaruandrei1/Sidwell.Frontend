@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/vue-query';
 import { type Ref, unref } from 'vue';
 import { api } from '../shared/api/client';
+import { readCache, withLocalCache } from '../shared/api/localCache';
 import type {
   TickerDetail,
   DividendInfoDto,
@@ -74,7 +75,13 @@ function estimateCalendarDate(tradingDays: number): string {
 export function useTickerDetailQuery(symbol: Ref<string> | string) {
   return useQuery({
     queryKey: ['ticker', symbol],
-    queryFn: () => api.get<TickerDetail>(`/tickers/${unref(symbol)}`),
+    queryFn: () => {
+      const sym = unref(symbol);
+      return withLocalCache('ticker-detail', { symbol: sym }, () => api.get<TickerDetail>(`/tickers/${sym}`))();
+    },
+    initialData: () => readCache<TickerDetail>('ticker-detail', { symbol: unref(symbol) }),
+    // Cached data paints instantly but a background refetch always runs to self-correct if stale.
+    refetchOnMount: 'always',
     staleTime: 60 * 1000 // 1 minute
   });
 }

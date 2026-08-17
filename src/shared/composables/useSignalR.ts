@@ -84,17 +84,29 @@ export function useSignalR() {
       currentProgress.value = data;
     });
 
-    hubConnection.on('SYNC_COMPLETE', (data?: { symbol?: string }) => {
+    hubConnection.on('SYNC_COMPLETE', (data?: { symbol?: string; status?: string; error?: string }) => {
       const completedSymbol = data?.symbol ?? currentProgress.value?.symbol ?? null;
       syncInProgress.value = false;
       currentProgress.value = null;
+
+      if (data?.status === 'FAILED') {
+        toast.error(
+          `Sync Failed${completedSymbol ? ` — ${completedSymbol}` : ''}`,
+          data.error || 'One or more sync steps failed. Data may be incomplete.'
+        );
+      }
+
       queryClient.invalidateQueries({ queryKey: ['watchlist'] });
       queryClient.invalidateQueries({ queryKey: ['portfolio'] });
       if (completedSymbol) {
         queryClient.invalidateQueries({ queryKey: ['ticker', completedSymbol] });
         queryClient.invalidateQueries({ queryKey: ['ticker-dividends', completedSymbol] });
-        queryClient.invalidateQueries({ queryKey: ['ticker-verdict', completedSymbol] });
+        queryClient.invalidateQueries({ queryKey: ['ticker-verdict-technical', completedSymbol] });
         queryClient.invalidateQueries({ queryKey: ['ticker-news', completedSymbol] });
+        queryClient.invalidateQueries({ queryKey: ['ticker-indicators', completedSymbol] });
+        queryClient.invalidateQueries({ queryKey: ['ticker-growth-projection', completedSymbol] });
+        queryClient.invalidateQueries({ queryKey: ['ticker-my-projection', completedSymbol] });
+        queryClient.invalidateQueries({ queryKey: ['ticker-transactions', completedSymbol] });
       }
     });
 

@@ -10,8 +10,7 @@ import { mockBrokers, getMockBrokerFeeEstimate } from './fixtures/brokers';
 import {
   mockSettings,
   mockDividendTaxRates,
-  mockNotifications,
-  mockScreenerPresets
+  mockNotifications
 } from './fixtures/settings';
 import {
   mockFinanceSettings,
@@ -22,7 +21,6 @@ import type {
   UserDto,
   SettingsDto,
   WatchlistRow,
-  ScreenerResultRow,
   ExpenseItemDto,
   WealthAllocationDto,
   FinanceSettingsDto,
@@ -303,24 +301,6 @@ export const handlers = [
     const id = String(params.id);
     inMemoryNotifications = inMemoryNotifications.map((n) => (n.id === id ? { ...n, isRead: true } : n));
     return new HttpResponse(null, { status: 204 });
-  }),
-
-  // Screener
-  http.post(`${baseUrl}/screener`, () => {
-    const rows: ScreenerResultRow[] = mockTickerSummaries.map((t) => ({
-      ticker: t,
-      composite: null,
-      metrics: {
-        dividendYield: t.symbol === 'H2O.RO' ? '8.40' : t.symbol === 'TLV.RO' ? '5.80' : '0.65',
-        peTrailing: t.symbol === 'TLV.RO' ? '8.20' : '18.50',
-        piotroski: '8.00'
-      }
-    }));
-    return HttpResponse.json(rows);
-  }),
-
-  http.get(`${baseUrl}/screener/presets`, () => {
-    return HttpResponse.json(mockScreenerPresets);
   }),
 
   // ==========================================

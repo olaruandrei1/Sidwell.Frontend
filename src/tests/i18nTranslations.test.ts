@@ -25,7 +25,6 @@ describe('i18n Multi-Language Support & Generic Enums', () => {
       it('has complete navigation strings', () => {
         expect(messages.nav.dashboard).toBeDefined();
         expect(messages.nav.watchlist).toBeDefined();
-        expect(messages.nav.screener).toBeDefined();
         expect(messages.nav.alerts).toBeDefined();
         expect(messages.nav.settings).toBeDefined();
         expect(messages.nav.finances).toBeDefined();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import {
   useTickerDetailQuery,
@@ -11,6 +11,7 @@ import {
   useSyncTriggerMutation
 } from '../../queries/useTickersQuery';
 import { useSignalR } from '../../shared/composables/useSignalR';
+import { useCacheSwapPulse } from '../../shared/composables/useCacheSwapPulse';
 import { cleanDecimal } from '../../shared/utils/format';
 import { useToast } from '../../shared/composables/useToast';
 import CompositeGauge from '../../shared/ui/organisms/CompositeGauge.vue';
@@ -36,7 +37,8 @@ const route = useRoute();
 const toast = useToast();
 
 const symbol = computed(() => String(route.params.symbol || 'TLV.RO'));
-const { data: detail, isLoading: loadingDetail } = useTickerDetailQuery(symbol);
+const { data: detail, isLoading: loadingDetail, dataUpdatedAt: detailUpdatedAt } = useTickerDetailQuery(symbol);
+const priceJustUpdated = useCacheSwapPulse(detailUpdatedAt);
 const { data: dividendsInfo, isLoading: loadingDivs } = useTickerDividendsQuery(symbol);
 const { data: verdict, isLoading: loadingVerdict, isError: verdictError } = useTickerVerdictQuery(symbol);
 const { data: algorithmsMetadata } = useAlgorithmsMetadataQuery();
@@ -111,7 +113,12 @@ const scoredAlgos = computed(() =>
   (detail.value?.algorithms || []).filter((a) => a.score !== null && a.score !== undefined)
 );
 
+const lastProjectionParams = { endYear: 2060, reinvest: true, shares: '500' };
+
 const fetchProjection = async (endYear = 2060, reinvest = true, shares = '500') => {
+  lastProjectionParams.endYear = endYear;
+  lastProjectionParams.reinvest = reinvest;
+  lastProjectionParams.shares = shares;
   try {
     const res = await projectionMutation.mutateAsync({ shares, endYear, reinvest });
     projectionData.value = res;
@@ -127,6 +134,14 @@ watch(
   },
   { immediate: true }
 );
+
+// Dividend data can change after a Sync (SYNC_COMPLETE invalidates ticker-dividends),
+// so re-derive the projection whenever fresh dividend data arrives, keeping the user's params.
+watch(dividendsInfo, (newVal, oldVal) => {
+  if (newVal && oldVal) {
+    fetchProjection(lastProjectionParams.endYear, lastProjectionParams.reinvest, lastProjectionParams.shares);
+  }
+});
 
 const handleUpdateProjectionParams = (endYear: number, reinvest: boolean, shares = '500') => {
   fetchProjection(endYear, reinvest, shares);
@@ -253,6 +268,19 @@ const rangePercent = computed(() => {
   if (hi <= lo) return 50;
   return Math.min(100, Math.max(0, ((price - lo) / (hi - lo)) * 100));
 });
+
+// Only one PriceChart instance is ever mounted (desktop vs mobile layout) — matches
+// Tailwind's `lg` breakpoint exactly so we don't pay for a second hidden ECharts instance.
+const isLgUp = ref(window.matchMedia('(min-width: 1024px)').matches);
+let lgMediaQuery: MediaQueryList | null = null;
+const handleLgChange = (e: MediaQueryListEvent) => { isLgUp.value = e.matches; };
+onMounted(() => {
+  lgMediaQuery = window.matchMedia('(min-width: 1024px)');
+  lgMediaQuery.addEventListener('change', handleLgChange);
+});
+onUnmounted(() => {
+  lgMediaQuery?.removeEventListener('change', handleLgChange);
+});
 </script>
 
 <template>
@@ -313,31 +341,34 @@ const rangePercent = computed(() => {
       </div>
 
       <!-- Price + gauge, centered on the background -->
-      <div v-else class="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16 pt-2">
+      <div v-else class="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-10 pt-2">
 
         <!-- Price -->
-        <div class="flex flex-col items-center lg:items-start gap-3">
+        <div class="flex flex-col items-center lg:items-start gap-3 lg:shrink-0">
           <div class="text-center lg:text-left">
             <div class="flex items-baseline gap-2 justify-center lg:justify-start">
-              <span class="text-5xl font-black font-mono text-gray-50 tabular-nums leading-none">
+              <span
+                class="text-5xl lg:text-6xl font-black font-mono text-gray-50 tabular-nums leading-none transition-colors duration-500"
+                :class="priceJustUpdated ? 'sw-fresh-pulse' : ''"
+              >
                 {{ latestClose != null ? latestClose.toFixed(2) : 'N/A' }}
               </span>
-              <span class="text-base text-gray-500 font-mono">{{ detail?.ticker.currency }}</span>
+              <span class="text-base lg:text-lg text-gray-500 font-mono">{{ detail?.ticker.currency }}</span>
             </div>
             <div class="flex items-center gap-2 mt-2 justify-center lg:justify-start">
               <span
-                class="text-base font-bold font-mono tabular-nums"
+                class="text-base lg:text-lg font-bold font-mono tabular-nums"
                 :class="dayChange >= 0 ? 'text-emerald-400' : 'text-rose-400'"
               >
                 {{ dayChange >= 0 ? '+' : '' }}{{ dayChange.toFixed(2) }}
-                <span class="text-sm opacity-80">({{ dayChange >= 0 ? '+' : '' }}{{ dayChangePct.toFixed(2) }}%)</span>
+                <span class="text-sm lg:text-base opacity-80">({{ dayChange >= 0 ? '+' : '' }}{{ dayChangePct.toFixed(2) }}%)</span>
               </span>
               <span class="text-[10px] text-gray-600 font-mono uppercase tracking-wider">vs prev close</span>
             </div>
           </div>
 
           <!-- 52W range bar -->
-          <div v-if="detail?.keyStats?.fiftyTwoWeekLow && detail?.keyStats?.fiftyTwoWeekHigh" class="space-y-1.5 w-full max-w-[340px]">
+          <div v-if="detail?.keyStats?.fiftyTwoWeekLow && detail?.keyStats?.fiftyTwoWeekHigh" class="space-y-1.5 w-full max-w-[340px] lg:max-w-[380px]">
             <div class="relative h-2.5 bg-white/15 rounded-full border border-white/10 shadow-inner">
               <div
                 class="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-terminal-accent/40 to-terminal-accent"
@@ -357,13 +388,13 @@ const rangePercent = computed(() => {
         </div>
 
         <!-- Chart in between price and composite on desktop only -->
-        <div class="hidden lg:block flex-1 min-w-0 max-w-2xl">
+        <div v-if="isLgUp" class="flex-1 min-w-0">
           <PriceChart :bars="detail?.price.history || []" :height="320" :symbol="symbol" :currency="detail?.ticker.currency || 'USD'" />
         </div>
 
         <!-- Composite Gauge (de-carded) -->
-        <div class="flex-shrink-0 w-full max-w-[300px]">
-          <CompositeGauge :composite="detail?.composite || null" size="md" />
+        <div class="flex-shrink-0 w-full max-w-[300px] lg:max-w-[340px]">
+          <CompositeGauge :composite="detail?.composite || null" size="lg" />
         </div>
       </div>
     </div>
@@ -414,20 +445,22 @@ const rangePercent = computed(() => {
         </span>
       </div>
 
-          <!-- DESKTOP: flat wrapping tiles — tap any for an explanation -->
+          <!-- DESKTOP: flat wrapping tiles — tap any for an explanation. Always rendered (falls back to
+               N/A) so desktop and mobile agree on which stats exist for this ticker instead of desktop
+               silently hiding rows that mobile shows as N/A. -->
           <div class="hidden sm:flex flex-wrap gap-2 w-full">
-            <StatTile v-if="detail?.keyStats?.peTrailing != null" label="P/E Trailing" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('peTrailing', formatStat(detail?.keyStats?.peTrailing, 'N/A', 2))">{{ formatStat(detail?.keyStats?.peTrailing, 'N/A', 2) }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.priceToBook != null" label="P/B Ratio" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('priceToBook', formatStat(detail?.keyStats?.priceToBook, 'N/A', 2))">{{ formatStat(detail?.keyStats?.priceToBook, 'N/A', 2) }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.roeTtm != null" label="ROE TTM" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('roeTtm', detail?.keyStats?.roeTtm ? `${formatStat(detail.keyStats.roeTtm, 'N/A', 2)}%` : 'N/A')">{{ detail?.keyStats?.roeTtm ? `${formatStat(detail.keyStats.roeTtm, 'N/A', 2)}%` : 'N/A' }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.beta != null" label="Beta (1Y)" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('beta', formatStat(detail?.keyStats?.beta, 'N/A', 2))">{{ formatStat(detail?.keyStats?.beta, 'N/A', 2) }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.debtToEquity != null" label="D/E Ratio" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('debtToEquity', formatStat(detail?.keyStats?.debtToEquity, 'N/A', 2))">{{ formatStat(detail?.keyStats?.debtToEquity, 'N/A', 2) }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.revenueGrowthTtmYoy != null" label="Rev. Growth" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('revenueGrowthTtmYoy', detail?.keyStats?.revenueGrowthTtmYoy ? `${formatStat(detail.keyStats.revenueGrowthTtmYoy, 'N/A', 2)}%` : 'N/A')">{{ detail?.keyStats?.revenueGrowthTtmYoy ? `${formatStat(detail.keyStats.revenueGrowthTtmYoy, 'N/A', 2)}%` : 'N/A' }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.evToEbitda != null" label="EV/EBITDA" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('evToEbitda', formatStat(detail?.keyStats?.evToEbitda, 'N/A', 2))">{{ formatStat(detail?.keyStats?.evToEbitda, 'N/A', 2) }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.targetOneYear != null" label="1Y Target" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('targetOneYear', formatStat(detail?.keyStats?.targetOneYear, 'N/A', 2))"><MoneyText :value="detail?.keyStats?.targetOneYear" :currency="detail?.ticker.currency" :color="false" /></StatTile>
-            <StatTile v-if="detail?.keyStats?.marketCap != null" label="Market Cap" compact class="flex-1 min-w-[120px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('marketCap', `${formatLargeNum(detail?.keyStats?.marketCap)} ${detail?.ticker.currency || ''}`)">{{ formatLargeNum(detail?.keyStats?.marketCap) }} {{ detail?.ticker.currency || '' }}</StatTile>
-            <StatTile v-if="detail?.price.latest?.volume != null" label="Volume" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('volume', formatLargeNum(String(detail?.price.latest?.volume ?? '')))">{{ formatLargeNum(String(detail?.price.latest?.volume ?? '')) }}</StatTile>
-            <StatTile v-if="detail?.dividends?.dividendYield" label="Div. Yield" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('dividendYield', `${parseFloat(String(detail.dividends.dividendYield)).toFixed(2)}%`)">{{ `${parseFloat(String(detail.dividends.dividendYield)).toFixed(2)}%` }}</StatTile>
-            <StatTile v-if="detail?.keyStats?.earningsDate" label="Earnings" compact class="flex-1 min-w-[110px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('earningsDate', detail.keyStats.earningsDate)">{{ detail.keyStats.earningsDate }}</StatTile>
+            <StatTile label="P/E Trailing" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('peTrailing', formatStat(detail?.keyStats?.peTrailing, 'N/A', 2))">{{ formatStat(detail?.keyStats?.peTrailing, 'N/A', 2) }}</StatTile>
+            <StatTile label="P/B Ratio" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('priceToBook', formatStat(detail?.keyStats?.priceToBook, 'N/A', 2))">{{ formatStat(detail?.keyStats?.priceToBook, 'N/A', 2) }}</StatTile>
+            <StatTile label="ROE TTM" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('roeTtm', detail?.keyStats?.roeTtm ? `${formatStat(detail.keyStats.roeTtm, 'N/A', 2)}%` : 'N/A')">{{ detail?.keyStats?.roeTtm ? `${formatStat(detail.keyStats.roeTtm, 'N/A', 2)}%` : 'N/A' }}</StatTile>
+            <StatTile label="Beta (1Y)" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('beta', formatStat(detail?.keyStats?.beta, 'N/A', 2))">{{ formatStat(detail?.keyStats?.beta, 'N/A', 2) }}</StatTile>
+            <StatTile label="D/E Ratio" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('debtToEquity', formatStat(detail?.keyStats?.debtToEquity, 'N/A', 2))">{{ formatStat(detail?.keyStats?.debtToEquity, 'N/A', 2) }}</StatTile>
+            <StatTile label="Rev. Growth" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('revenueGrowthTtmYoy', detail?.keyStats?.revenueGrowthTtmYoy ? `${formatStat(detail.keyStats.revenueGrowthTtmYoy, 'N/A', 2)}%` : 'N/A')">{{ detail?.keyStats?.revenueGrowthTtmYoy ? `${formatStat(detail.keyStats.revenueGrowthTtmYoy, 'N/A', 2)}%` : 'N/A' }}</StatTile>
+            <StatTile label="EV/EBITDA" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('evToEbitda', formatStat(detail?.keyStats?.evToEbitda, 'N/A', 2))">{{ formatStat(detail?.keyStats?.evToEbitda, 'N/A', 2) }}</StatTile>
+            <StatTile label="1Y Target" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('targetOneYear', formatStat(detail?.keyStats?.targetOneYear, 'N/A', 2))"><MoneyText :value="detail?.keyStats?.targetOneYear" :currency="detail?.ticker.currency" :color="false" /></StatTile>
+            <StatTile label="Market Cap" compact class="flex-1 min-w-[120px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('marketCap', `${formatLargeNum(detail?.keyStats?.marketCap)} ${detail?.ticker.currency || ''}`)">{{ formatLargeNum(detail?.keyStats?.marketCap) }} {{ detail?.ticker.currency || '' }}</StatTile>
+            <StatTile label="Volume" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('volume', formatLargeNum(String(detail?.price.latest?.volume ?? '')))">{{ formatLargeNum(String(detail?.price.latest?.volume ?? '')) }}</StatTile>
+            <StatTile label="Div. Yield" compact class="flex-1 min-w-[100px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('dividendYield', detail?.dividends?.dividendYield ? `${parseFloat(String(detail.dividends.dividendYield)).toFixed(2)}%` : 'N/A')">{{ detail?.dividends?.dividendYield ? `${parseFloat(String(detail.dividends.dividendYield)).toFixed(2)}%` : 'N/A' }}</StatTile>
+            <StatTile label="Earnings" compact class="flex-1 min-w-[110px] cursor-pointer hover:border-terminal-accent/40" @click="openStatPanel('earningsDate', detail?.keyStats?.earningsDate || 'N/A')">{{ detail?.keyStats?.earningsDate || 'N/A' }}</StatTile>
           </div>
 
           <!-- MOBILE: swipeable cards -->
@@ -518,16 +551,16 @@ const rangePercent = computed(() => {
         </section>
 
     <!-- ── Verdict ─────────────────────────────────────────────────────────── -->
-    <TickerVerdictCard v-if="!loadingDetail" :verdict="verdict" :is-loading="loadingVerdict" :is-error="verdictError" />
+    <TickerVerdictCard :verdict="verdict" :is-loading="loadingVerdict" :is-error="verdictError" />
 
-    <div v-if="!loadingDetail" class="w-full sm:max-w-md sm:ml-auto">
+    <div class="w-full sm:max-w-md sm:ml-auto">
       <ReportShortcutButtons :symbol="symbol" />
     </div>
 
     <!-- ── Chart + Algorithms (Fluid Flexbox layout) ───────────────────────── -->
     <div v-if="!loadingDetail" class="flex flex-wrap w-full gap-6 items-start">
       <!-- Price Chart (mobile only — desktop shows chart between price and composite above) -->
-      <div class="flex-1 min-w-[340px] max-w-full w-full lg:hidden">
+      <div v-if="!isLgUp" class="flex-1 min-w-[340px] max-w-full w-full">
         <PriceChart :bars="detail?.price.history || []" :height="360" :symbol="symbol" :currency="detail?.ticker.currency || 'USD'" />
       </div>
 
@@ -577,6 +610,26 @@ const rangePercent = computed(() => {
               {{ algo.details?.manipulator ? '⚠ Manipulation flagged' : '✓ Low manipulation risk' }}
             </div>
           </button>
+        </div>
+      </div>
+
+      <!-- No scored algorithms — explain which ones are unavailable and why, instead of showing nothing -->
+      <div v-else-if="(detail?.gatedAlgos?.length ?? 0) > 0" class="w-full lg:flex-1 space-y-2.5">
+        <div class="flex items-center justify-between px-1">
+          <h2 class="text-sm font-bold text-gray-100 uppercase tracking-wider font-mono">
+            Quantitative Algorithms
+          </h2>
+          <span class="text-[11px] text-gray-500 font-bold font-mono">{{ detail?.gatedAlgos?.length }} UNAVAILABLE</span>
+        </div>
+        <div class="border border-white/10 sw-glass-card rounded-2xl px-4 py-3.5 space-y-2">
+          <div
+            v-for="gated in detail?.gatedAlgos"
+            :key="gated.algoName"
+            class="flex items-center justify-between gap-3 text-xs font-mono"
+          >
+            <span class="text-gray-300 font-bold">{{ algoLabel(gated.algoName) }}</span>
+            <span class="text-gray-500">{{ gated.missingData }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -712,7 +765,7 @@ const rangePercent = computed(() => {
     </div>
 
     <!-- ── News — swipe carousel, cards directly on the background ───────── -->
-    <TickerNewsCarousel v-if="!loadingDetail" :symbol="symbol" />
+    <TickerNewsCarousel :symbol="symbol" />
 
     <!-- ── Projection & Holdings — title on background, shared growth model ── -->
     <div v-if="!loadingDetail" class="space-y-3">
@@ -806,7 +859,7 @@ const rangePercent = computed(() => {
     </div>
 
     <!-- ── Journal — note pages on the background; each page opens in a modal ── -->
-    <div v-if="!loadingDetail" class="pb-40 sm:pb-12">
+    <div class="pb-40 sm:pb-12">
       <TickerNotesSection :symbol="symbol" />
     </div>
 
@@ -824,3 +877,14 @@ const rangePercent = computed(() => {
     />
   </div>
 </template>
+
+<style scoped>
+/* Brief highlight when a cache-seeded value is replaced by a live network value. */
+.sw-fresh-pulse {
+  animation: sw-fresh-pulse-anim 0.7s ease-out;
+}
+@keyframes sw-fresh-pulse-anim {
+  0% { color: var(--color-terminal-accent, #00e599); text-shadow: 0 0 18px rgba(0, 229, 153, 0.6); }
+  100% { color: inherit; text-shadow: none; }
+}
+</style>

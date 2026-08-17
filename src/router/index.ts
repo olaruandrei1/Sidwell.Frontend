@@ -39,11 +39,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../features/ticker/TickerDetailView.vue')
   },
   {
-    path: '/screener',
-    name: 'screener',
-    component: () => import('../features/screener/ScreenerView.vue')
-  },
-  {
     path: '/settings',
     name: 'settings',
     component: () => import('../features/settings/SettingsView.vue')

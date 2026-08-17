@@ -333,23 +333,19 @@ export interface NotificationDto {
   createdAt: string;
 }
 
-export interface ScreenerResultRow {
-  ticker: TickerSummary;
-  composite: CompositeScore | null;
-  metrics: Record<string, Decimal | null>;
-}
-
-export interface ScreenerPreset {
-  id: string;
-  name: string;
-  criteria: Record<string, unknown>;
-}
-
 // ==========================================
 // Tracking Finances & Wealth Allocation Module
 // ==========================================
 
-export type FinanceCategoryType = 'LOAN' | 'SUBSCRIPTION' | 'UTILITY' | 'VARIABLE' | 'FOOD' | 'CIGARETTES' | 'OTHER';
+// The 7 builtin codes remain, but users can add their own via Settings — so this is any string,
+// not a closed union. Builtin codes still get translated labels (t('enums.' + code)); custom
+// codes carry their own user-entered label (see FinanceCategoryTypeDef).
+export type FinanceCategoryType = string;
+
+export interface FinanceCategoryTypeDef {
+  code: string;
+  label: string;
+}
 
 export interface FinanceCategoryDef {
   id: string;
@@ -413,6 +409,7 @@ export interface FinanceSettingsDto {
   categories: FinanceCategoryDef[];
   banks: string[];
   brokers: string[];
+  categoryTypes: FinanceCategoryTypeDef[];
 }
 
 export interface BrokerNetInvestedDto {

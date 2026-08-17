@@ -5,11 +5,14 @@ import { useFinanceSettingsQuery, useUpdateFinanceSettingsMutation } from '../..
 import AppButton from '../../../shared/ui/atoms/AppButton.vue';
 import AppInput from '../../../shared/ui/atoms/AppInput.vue';
 import FormField from '../../../shared/ui/molecules/FormField.vue';
-import type { FinanceCategoryType, FinanceCategoryDef } from '../../../shared/api/types';
+import { computed } from 'vue';
+import type { FinanceCategoryType, FinanceCategoryDef, FinanceCategoryTypeDef } from '../../../shared/api/types';
 
 const { t } = useI18n();
 const { data: settings } = useFinanceSettingsQuery();
 const updateSettingsMutation = useUpdateFinanceSettingsMutation();
+
+const BUILTIN_TYPE_CODES: FinanceCategoryType[] = ['LOAN', 'SUBSCRIPTION', 'UTILITY', 'FOOD', 'VARIABLE', 'CIGARETTES', 'OTHER'];
 
 const newCatName = ref('');
 const newCatType = ref<FinanceCategoryType>('SUBSCRIPTION');
@@ -20,19 +23,60 @@ const editCatType = ref<FinanceCategoryType>('SUBSCRIPTION');
 
 const newBankName = ref('');
 const newBrokerName = ref('');
+const newTypeLabel = ref('');
 
-const ALL_TYPES: { value: FinanceCategoryType; label: string }[] = [
-  { value: 'LOAN', label: '' },
-  { value: 'SUBSCRIPTION', label: '' },
-  { value: 'UTILITY', label: '' },
-  { value: 'FOOD', label: '' },
-  { value: 'VARIABLE', label: '' },
-  { value: 'CIGARETTES', label: '' },
-  { value: 'OTHER', label: '' },
-];
+// Builtin types keep their translated label; custom ones (from settings.categoryTypes) show
+// the user-entered label as-is since they don't exist in any locale file.
+const ALL_TYPES = computed<{ value: FinanceCategoryType; label: string }[]>(() => [
+  ...BUILTIN_TYPE_CODES.map((code) => ({ value: code, label: t('enums.' + code, code) })),
+  ...(settings.value?.categoryTypes ?? []).map((ct) => ({ value: ct.code, label: ct.label }))
+]);
 
 function getTypeLabel(type: FinanceCategoryType) {
+  const custom = settings.value?.categoryTypes?.find((ct) => ct.code === type);
+  if (custom) return custom.label;
   return t('enums.' + type, type);
+}
+
+const COMBINING_DIACRITICS = new RegExp('[̀-ͯ]', 'g');
+
+function slugifyTypeCode(label: string): string {
+  const base = label
+    .normalize('NFD')
+    .replace(COMBINING_DIACRITICS, '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 20);
+  return base || `TYPE_${Date.now()}`;
+}
+
+function isTypeInUse(code: string): boolean {
+  return (settings.value?.categories ?? []).some((c) => c.type === code);
+}
+
+async function handleAddType() {
+  if (!settings.value || !newTypeLabel.value.trim()) return;
+  const label = newTypeLabel.value.trim();
+  let code = slugifyTypeCode(label);
+  const existingCodes = new Set([...BUILTIN_TYPE_CODES, ...(settings.value.categoryTypes ?? []).map((ct) => ct.code)]);
+  if (existingCodes.has(code)) code = `${code}_${Date.now().toString(36).toUpperCase()}`.slice(0, 20);
+
+  const nextType: FinanceCategoryTypeDef = { code, label };
+  await updateSettingsMutation.mutateAsync({
+    ...settings.value,
+    categoryTypes: [...(settings.value.categoryTypes ?? []), nextType]
+  });
+  newTypeLabel.value = '';
+}
+
+async function handleRemoveType(code: string) {
+  if (!settings.value || isTypeInUse(code)) return;
+  await updateSettingsMutation.mutateAsync({
+    ...settings.value,
+    categoryTypes: (settings.value.categoryTypes ?? []).filter((ct) => ct.code !== code)
+  });
 }
 
 function startEdit(cat: FinanceCategoryDef) {
@@ -234,6 +278,42 @@ async function handleRemoveBroker(brokerName: string) {
 
           <div v-if="settings.categories.length === 0" class="py-4 text-center text-xs text-gray-500 font-mono">
             Nicio categorie definită. Adaugă prima categorie mai sus.
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Custom TIP / SECȚIUNE values ──────────────────────────────── -->
+      <div class="sw-glass-card border border-white/10 rounded-2xl p-5 space-y-4 shadow-lg">
+        <h3 class="text-xs font-mono font-bold text-terminal-accent uppercase tracking-wider">
+          {{ t('settings.typesTitle') }}
+        </h3>
+        <p class="text-[11px] text-gray-500 font-sans -mt-2">{{ t('settings.typesSubtitle') }}</p>
+
+        <form @submit.prevent="handleAddType" class="flex items-center gap-2">
+          <AppInput v-model="newTypeLabel" :placeholder="t('settings.newTypeName')" class="flex-1" />
+          <AppButton type="submit" variant="secondary" size="sm" :disabled="!newTypeLabel.trim()">
+            {{ t('settings.addTypeBtn') }}
+          </AppButton>
+        </form>
+
+        <div class="flex flex-wrap gap-2">
+          <div
+            v-for="ct in settings.categoryTypes"
+            :key="ct.code"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-xs font-mono text-gray-200 hover:border-white/20 transition-all"
+          >
+            <span>{{ ct.label }}</span>
+            <button
+              type="button"
+              class="font-bold transition-colors"
+              :class="isTypeInUse(ct.code) ? 'text-gray-700 cursor-not-allowed' : 'text-gray-500 hover:text-rose-400'"
+              :disabled="isTypeInUse(ct.code)"
+              :title="isTypeInUse(ct.code) ? t('settings.typeInUse') : ''"
+              @click="handleRemoveType(ct.code)"
+            >✕</button>
+          </div>
+          <div v-if="!settings.categoryTypes || settings.categoryTypes.length === 0" class="text-xs text-gray-500 font-mono py-1">
+            {{ t('settings.noCustomTypes') }}
           </div>
         </div>
       </div>
