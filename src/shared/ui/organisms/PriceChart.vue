@@ -135,7 +135,14 @@ function typeString(kind: IndicatorKind, period: number): string {
 
 const indicatorTypes = computed(() => activeIndicators.value.map((i) => typeString(i.kind, i.period)));
 
-const { data: indicatorData } = useTickerIndicatorsQuery(computed(() => props.symbol), indicatorTypes);
+const { data: indicatorData, isLoading: indicatorLoading } = useTickerIndicatorsQuery(computed(() => props.symbol), indicatorTypes);
+
+watch([indicatorTypes, indicatorData, indicatorLoading], ([types, data, loading]) => {
+  // eslint-disable-next-line no-console
+  console.log('[INDICATOR-DEBUG] requested types:', types, 'loading:', loading);
+  // eslint-disable-next-line no-console
+  console.log('[INDICATOR-DEBUG] received data:', JSON.parse(JSON.stringify(data ?? [])));
+}, { immediate: true });
 
 function buildKey(kind: IndicatorKind, period: number): string {
   return PARAMETERLESS_KINDS.includes(kind) ? kind : `${kind}${period}`;
