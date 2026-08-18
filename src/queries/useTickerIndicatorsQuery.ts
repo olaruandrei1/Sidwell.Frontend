@@ -32,11 +32,16 @@ export function useTickerIndicatorsQuery(symbolRef: MaybeRef<string>, typesRef: 
         const fetched = await api.get<IndicatorSeriesDto[]>(`/tickers/${encodeURIComponent(symbol)}/indicators`, {
           params: { types: missing.join(',') },
         });
+        // eslint-disable-next-line no-console
+        console.log('[INDICATOR-DEBUG] fetch succeeded, raw response:', fetched);
         const next = new Map(cache.value);
         for (const dto of fetched) {
           next.set(keyOf(dto), dto);
         }
         cache.value = next;
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[INDICATOR-DEBUG] fetch FAILED:', err);
       } finally {
         isLoading.value = false;
       }
