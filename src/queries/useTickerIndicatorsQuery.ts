@@ -2,16 +2,15 @@ import { ref, computed, watch, type MaybeRef, unref } from 'vue';
 import { api } from '../shared/api/client';
 import type { IndicatorSeriesDto } from '../shared/api/types';
 
-function keyOf(dto: IndicatorSeriesDto): string {
-  const period = (dto.params as Record<string, number> | undefined)?.period;
-  return typeof period === 'number' ? `${dto.type}${period}` : dto.type;
-}
-
 // Per-type cache so toggling one indicator only fetches the newly-added type(s) instead of
-// re-requesting every active indicator every time the active set changes.
+// re-requesting every active indicator every time the active set changes. Cached by the exact
+// requested type string (e.g. "sma20"), paired positionally with the response array — the
+// backend preserves request order (Core computes indicators via an order-preserving LINQ
+// projection), so this avoids reverse-engineering a matching key from the response shape.
 export function useTickerIndicatorsQuery(symbolRef: MaybeRef<string>, typesRef: MaybeRef<string[]>) {
   const cache = ref(new Map<string, IndicatorSeriesDto>());
   const isLoading = ref(false);
+  let pendingSymbol: string | null = null;
 
   watch(
     [() => unref(symbolRef), () => [...unref(typesRef)].sort().join(',')],
@@ -27,21 +26,25 @@ export function useTickerIndicatorsQuery(symbolRef: MaybeRef<string>, typesRef: 
       const missing = types.filter((t) => !cache.value.has(t));
       if (missing.length === 0) return;
 
+      // Guards against an in-flight fetch's response overwriting a newer request's cache
+      // entries if the user toggles indicators again before the first fetch resolves.
+      const requestToken = symbol;
+      pendingSymbol = requestToken;
+
       isLoading.value = true;
       try {
         const fetched = await api.get<IndicatorSeriesDto[]>(`/tickers/${encodeURIComponent(symbol)}/indicators`, {
           params: { types: missing.join(',') },
         });
-        // eslint-disable-next-line no-console
-        console.log('[INDICATOR-DEBUG] fetch succeeded, raw response:', fetched);
+
+        if (pendingSymbol !== requestToken) return;
+
         const next = new Map(cache.value);
-        for (const dto of fetched) {
-          next.set(keyOf(dto), dto);
-        }
+        missing.forEach((type, idx) => {
+          const dto = fetched[idx];
+          if (dto) next.set(type, dto);
+        });
         cache.value = next;
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('[INDICATOR-DEBUG] fetch FAILED:', err);
       } finally {
         isLoading.value = false;
       }

@@ -39,14 +39,6 @@ const toast = useToast();
 const symbol = computed(() => String(route.params.symbol || 'TLV.RO'));
 const { data: detail, isLoading: loadingDetail, dataUpdatedAt: detailUpdatedAt } = useTickerDetailQuery(symbol);
 const priceJustUpdated = useCacheSwapPulse(detailUpdatedAt);
-watch(detail, (d) => {
-  // eslint-disable-next-line no-console
-  console.log('[TICKER-DEBUG] keyStats:', JSON.parse(JSON.stringify(d?.keyStats ?? null)));
-  // eslint-disable-next-line no-console
-  console.log('[TICKER-DEBUG] price.latest:', JSON.parse(JSON.stringify(d?.price?.latest ?? null)));
-  // eslint-disable-next-line no-console
-  console.log('[TICKER-DEBUG] dividends:', JSON.parse(JSON.stringify(d?.dividends ?? null)));
-}, { immediate: true });
 const { data: dividendsInfo, isLoading: loadingDivs } = useTickerDividendsQuery(symbol);
 const { data: verdict, isLoading: loadingVerdict, isError: verdictError } = useTickerVerdictQuery(symbol);
 const { data: algorithmsMetadata } = useAlgorithmsMetadataQuery();
