@@ -114,6 +114,7 @@ export const fr = {
     incomeLabel: 'Revenu',
     subTabFixed: 'Fixes',
     subTabVariable: 'Variables',
+    subTabOverview: 'Vue d\'ensemble',
     totalLabel: 'Total',
     noFixedForMonth: 'Aucune dépense fixe pour {month}.',
     noVariableForMonth: 'Aucune dépense variable pour {month}.',

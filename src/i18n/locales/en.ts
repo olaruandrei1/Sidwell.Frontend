@@ -128,6 +128,7 @@ export const en = {
     incomeLabel: 'Income',
     subTabFixed: 'Fixed',
     subTabVariable: 'Variable',
+    subTabOverview: 'Overview',
     totalLabel: 'Total',
     noFixedForMonth: 'No fixed expenses for {month}.',
     noVariableForMonth: 'No variable receipts for {month}.',

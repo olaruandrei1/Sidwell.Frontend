@@ -237,14 +237,23 @@ const hasDividendData = computed(() => {
   return (Number.isFinite(yield_) && yield_ > 0) || (Number.isFinite(fwd) && fwd > 0);
 });
 
+const isLivePrice = computed(() => detail.value?.price.live != null);
+
 const latestClose = computed(() => {
+  const live = detail.value?.price.live;
+  if (live != null) return parseFloat(String(live));
   const c = detail.value?.price.latest?.close;
   return c != null ? parseFloat(String(c)) : null;
 });
 
 const prevClose = computed(() => {
   const hist = detail.value?.price.history;
-  if (!hist || hist.length < 2) return null;
+  if (!hist || hist.length === 0) return null;
+  // When showing a live intraday price, today has no row in history yet, so the last historical
+  // bar IS "yesterday" (the correct reference for "vs prev close"). Otherwise latestClose already
+  // *is* that last bar, so the reference is the one before it.
+  if (isLivePrice.value) return parseFloat(String(hist.at(-1)!.close));
+  if (hist.length < 2) return null;
   return parseFloat(String(hist.at(-2)!.close));
 });
 
@@ -358,6 +367,14 @@ onUnmounted(() => {
                   {{ latestClose != null ? latestClose.toFixed(2) : 'N/A' }}
                 </span>
                 <span class="text-base lg:text-lg text-gray-500 font-mono">{{ detail?.ticker.currency }}</span>
+                <span
+                  v-if="isLivePrice"
+                  class="flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400"
+                  title="Live intraday quote — market is open"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                  Live
+                </span>
               </div>
               <div class="flex items-center gap-2 mt-2 justify-center lg:justify-start">
                 <span

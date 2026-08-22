@@ -207,6 +207,8 @@ export interface TickerDetail {
   price: {
     latest: PriceBar | null;
     history: PriceBar[];
+    /** Near-real-time quote while the market is open; null when unavailable — fall back to latest.close. */
+    live: string | null;
   };
   composite: CompositeScore | null;
   algorithms: AlgoScore[];

@@ -210,7 +210,7 @@ export function getMockTickerDetail(symbol: string): TickerDetail {
 
   return {
     ticker: { ...summary, secCik: symbol === 'AAPL' || symbol === 'MSFT' ? '0000320193' : null },
-    price: { latest, history },
+    price: { latest, history, live: null },
     composite: mockCompositeScores[symbol] || mockCompositeScores['TLV.RO'] || null,
     algorithms: mockAlgoScores[symbol] || [],
     fundamentals: mockFundamentals,

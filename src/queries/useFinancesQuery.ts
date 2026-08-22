@@ -281,6 +281,19 @@ export function useDeleteExpenseMutation() {
   });
 }
 
+export interface ExpenseExportPayload {
+  format: 'pdf' | 'xlsx';
+  month?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export function useExportExpensesMutation() {
+  return useMutation({
+    mutationFn: (payload: ExpenseExportPayload) => api.postBlob('/finances/expenses/export', payload),
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Wealth Allocations
 // ─────────────────────────────────────────────────────────────────────────────

@@ -115,6 +115,7 @@ export const da = {
     incomeLabel: 'Indkomst',
     subTabFixed: 'Faste',
     subTabVariable: 'Variable',
+    subTabOverview: 'Oversigt',
     totalLabel: 'Total',
     noFixedForMonth: 'Ingen faste udgifter for {month}.',
     noVariableForMonth: 'Ingen variable udgifter for {month}.',

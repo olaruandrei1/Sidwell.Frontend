@@ -18,6 +18,7 @@ import {
 import ExpenseAddModal from './components/ExpenseAddModal.vue';
 import GeminiReceiptModal from './components/GeminiReceiptModal.vue';
 import ExpenseDetailModal from './components/ExpenseDetailModal.vue';
+import ExpenseExportPanel from './components/ExpenseExportPanel.vue';
 import SimulateFutureSection from './components/SimulateFutureSection.vue';
 import AppButton from '../../shared/ui/atoms/AppButton.vue';
 import AppInput from '../../shared/ui/atoms/AppInput.vue';
@@ -196,6 +197,7 @@ const isNonRonIncome = computed(() => data.value?.settings.monthlyIncome.currenc
 const mobileCameraInput = ref<HTMLInputElement | null>(null);
 const nativeMonthSelectRef = ref<HTMLSelectElement | null>(null);
 const isFabOpen = ref(false);
+const isExportPanelOpen = ref(false);
 
 function triggerMobileCamera() {
   isFabOpen.value = false;
@@ -726,7 +728,12 @@ function getCategoryColor(type: string) {
 
 // Tab state
 const activeTab = ref<'cheltuieli' | 'avere' | 'simulare'>('cheltuieli');
-const activeExpenseTab = ref<'fixed' | 'variable'>('fixed');
+const activeExpenseTab = ref<'fixed' | 'variable' | 'overview'>('fixed');
+
+const allExpensesSorted = computed(() => {
+  if (!data.value) return [];
+  return [...data.value.expenses].sort((a, b) => convertToDisplay(b.amount, b.currency) - convertToDisplay(a.amount, a.currency));
+});
 
 const totalFixed = computed(() => loansAndSubscriptions.value.reduce((s, e) => s + convertToDisplay(e.amount, e.currency), 0));
 const totalVariable = computed(() => utilitiesAndVariable.value.reduce((s, e) => s + convertToDisplay(e.amount, e.currency), 0));
@@ -836,6 +843,9 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
         </AppButton>
         <AppButton variant="primary" @click="financesStore.openAddExpenseModal" size="sm" class="hidden sm:inline-flex">
           + Cheltuială
+        </AppButton>
+        <AppButton variant="secondary" @click="isExportPanelOpen = true" size="sm" class="hidden sm:inline-flex">
+          <span class="mr-1">⬇</span> Exportă
         </AppButton>
         <router-link to="/settings#finances" class="hidden sm:flex px-3 py-1.5 rounded-xl bg-terminal-surface border border-terminal-border hover:border-terminal-accent/50 text-xs font-mono text-gray-400 hover:text-gray-200 transition-colors items-center gap-1">
           <span>⚙</span><span>{{ t('finances.configEnumsBtn') }}</span>
@@ -997,9 +1007,9 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
     ════════════════════════════════════════════════════════════════════════════ -->
     <div v-if="data && activeTab === 'cheltuieli'" class="space-y-5">
 
-      <!-- Segmented control: FIXE | VARIABILE -->
+      <!-- Segmented control: FIXE | VARIABILE | GENERAL OVERVIEW -->
       <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div class="grid grid-cols-2 gap-0 p-1 rounded-2xl bg-terminal-surface border border-terminal-border w-full sm:w-auto">
+        <div class="grid grid-cols-3 gap-0 p-1 rounded-2xl bg-terminal-surface border border-terminal-border w-full sm:w-auto">
           <button
             type="button"
             @click="activeExpenseTab = 'fixed'"
@@ -1036,13 +1046,31 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
               :class="activeExpenseTab === 'variable' ? 'bg-sky-500/30 text-sky-100' : 'bg-terminal-bg text-gray-500'"
             >{{ utilitiesAndVariable.length }}</span>
           </button>
+          <button
+            type="button"
+            @click="activeExpenseTab = 'overview'; categoryDetail = null"
+            class="relative flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-mono font-bold uppercase tracking-wider transition-all duration-200"
+            :class="activeExpenseTab === 'overview'
+              ? 'bg-gradient-to-br from-violet-500/25 to-violet-600/15 text-violet-200 shadow-inner shadow-violet-500/10'
+              : 'text-gray-500 hover:text-gray-200'"
+          >
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-md"
+              :class="activeExpenseTab === 'overview' ? 'bg-violet-500/30 text-violet-100' : 'bg-terminal-bg text-gray-500'">
+              <svg viewBox="0 0 24 24" fill="none" class="w-3 h-3" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </span>
+            <span>{{ t('finances.subTabOverview') }}</span>
+            <span
+              class="min-w-[22px] px-1.5 py-0.5 rounded-md text-[11px] font-black tabular-nums"
+              :class="activeExpenseTab === 'overview' ? 'bg-violet-500/30 text-violet-100' : 'bg-terminal-bg text-gray-500'"
+            >{{ allExpensesSorted.length }}</span>
+          </button>
         </div>
         <div class="flex-1"></div>
         <div class="flex items-baseline gap-2 sm:justify-end px-3 sm:px-0">
           <span class="text-[10px] font-mono text-gray-500 uppercase tracking-wider">{{ t('finances.totalLabel') }}</span>
           <span class="text-lg font-mono font-black sw-private"
-            :class="activeExpenseTab === 'fixed' ? 'text-amber-300' : 'text-sky-300'">
-            {{ formatNumber(activeExpenseTab === 'fixed' ? totalFixed : totalVariable) }}
+            :class="activeExpenseTab === 'fixed' ? 'text-amber-300' : activeExpenseTab === 'variable' ? 'text-sky-300' : 'text-violet-300'">
+            {{ formatNumber(activeExpenseTab === 'fixed' ? totalFixed : activeExpenseTab === 'variable' ? totalVariable : totalExpenses) }}
             <span class="text-[11px] font-bold text-gray-400">{{ displayCurrency }}</span>
           </span>
         </div>
@@ -1099,19 +1127,19 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
                 <div v-if="item.currency !== displayCurrency" class="text-[10px] font-mono text-gray-600 mt-0.5 sw-private">{{ formatNumber(item.amount) }} {{ item.currency }}</div>
                 <div v-if="effectiveDueDate(item)" class="text-[10px] font-mono text-gray-500 mt-1">scadent {{ effectiveDueDate(item) }}</div>
               </div>
-              <div class="flex items-center gap-1.5 flex-shrink-0">
+              <div class="flex flex-col gap-2 flex-shrink-0">
                 <button
                   type="button"
                   @click="financesStore.openEditExpenseModal(item)"
-                  class="text-terminal-accent text-xs px-2.5 py-1.5 rounded-lg bg-terminal-accent/10 hover:bg-terminal-accent/20 border border-terminal-accent/20 transition-colors touch-manipulation"
+                  class="w-10 h-10 flex items-center justify-center text-terminal-accent rounded-lg bg-terminal-accent/10 hover:bg-terminal-accent/20 border border-terminal-accent/20 transition-colors touch-manipulation active:scale-95"
                   title="Editează"
-                ><Pencil :size="13" /></button>
+                ><Pencil :size="18" /></button>
                 <button
                   type="button"
                   @click="openDeleteConfirm(item)"
-                  class="text-gray-500 hover:text-red-400 text-xs px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 transition-colors touch-manipulation"
+                  class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-red-400 rounded-lg bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 transition-colors touch-manipulation active:scale-95"
                   title="Șterge"
-                ><X :size="13" /></button>
+                ><X :size="18" /></button>
               </div>
             </div>
           </div>
@@ -1185,10 +1213,12 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
                       <span v-if="exp.lineItems?.length" class="ml-2 text-terminal-accent/70">· {{ exp.lineItems.length }} articole</span>
                     </div>
                   </div>
-                  <div class="flex items-center gap-2 flex-shrink-0">
+                  <div class="flex items-center gap-3 flex-shrink-0">
                     <span class="text-sm font-mono font-bold text-gray-100 sw-private">{{ fmt(exp.amount, exp.currency) }} <span class="text-[10px] font-normal text-gray-500">{{ displayCurrency }}</span></span>
-                    <button type="button" class="sm:opacity-0 sm:group-hover:opacity-100 text-terminal-accent hover:text-terminal-accent/70 p-1.5 rounded transition-all touch-manipulation flex items-center" @click.stop="financesStore.openEditExpenseModal(exp)"><Pencil :size="13" /></button>
-                    <button type="button" class="sm:opacity-0 sm:group-hover:opacity-100 text-gray-600 hover:text-red-400 p-1.5 rounded transition-all touch-manipulation flex items-center" @click.stop="openDeleteConfirm(exp)"><X :size="13" /></button>
+                    <div class="flex flex-col gap-1.5">
+                      <button type="button" class="w-9 h-9 flex items-center justify-center text-terminal-accent bg-terminal-accent/10 hover:bg-terminal-accent/20 border border-terminal-accent/20 rounded-lg transition-colors touch-manipulation active:scale-95" @click.stop="financesStore.openEditExpenseModal(exp)"><Pencil :size="16" /></button>
+                      <button type="button" class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-red-400 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 rounded-lg transition-colors touch-manipulation active:scale-95" @click.stop="openDeleteConfirm(exp)"><X :size="16" /></button>
+                    </div>
                   </div>
                 </button>
 
@@ -1220,6 +1250,54 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
             </div>
           </div>
         </Transition>
+      </div>
+
+      <!-- ── GENERAL OVERVIEW: every expense this month, stacked one under another ── -->
+      <div v-if="activeExpenseTab === 'overview'">
+        <div v-if="allExpensesSorted.length === 0" class="py-12 text-center text-xs font-mono text-gray-500 bg-terminal-surface border border-terminal-border rounded-2xl">
+          {{ t('finances.noVariableForMonth', { month: financesStore.selectedMonth }) }}
+        </div>
+        <div v-else class="flex flex-col gap-2.5">
+          <div
+            v-for="item in allExpensesSorted"
+            :key="item.id"
+            class="bg-terminal-surface border border-terminal-border rounded-2xl px-4 py-3.5 flex items-center gap-3 hover:border-terminal-accent/40 transition-colors"
+          >
+            <span class="text-[10px] font-mono font-bold border rounded px-2 py-0.5 uppercase tracking-wider flex-shrink-0" :class="getCategoryColor(item.type)">
+              {{ item.type }}
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-mono font-bold text-gray-100 truncate">{{ item.name }}</div>
+              <div class="text-[10px] font-mono text-gray-500 mt-0.5">
+                {{ item.category }}
+                <span v-if="item.isRecurring" class="ml-1.5 text-amber-500">↺ recurent</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              @click="toggleStatus(item)"
+              class="px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold border cursor-pointer hover:opacity-80 transition-opacity touch-manipulation flex-shrink-0"
+              :class="getStatusBadgeClass(item.status)"
+            >{{ t('enums.' + item.status, item.status) }}</button>
+            <div class="text-right flex-shrink-0">
+              <div class="text-base font-mono font-black text-gray-100 sw-private">{{ fmt(item.amount, item.currency) }} <span class="text-[10px] font-normal text-gray-500">{{ displayCurrency }}</span></div>
+            </div>
+            <div class="flex flex-col gap-1.5 flex-shrink-0">
+              <button
+                type="button"
+                @click="financesStore.openEditExpenseModal(item)"
+                class="w-9 h-9 flex items-center justify-center text-terminal-accent rounded-lg bg-terminal-accent/10 hover:bg-terminal-accent/20 border border-terminal-accent/20 transition-colors touch-manipulation active:scale-95"
+                title="Editează"
+              ><Pencil :size="16" /></button>
+              <button
+                type="button"
+                @click="openDeleteConfirm(item)"
+                class="w-9 h-9 flex items-center justify-center text-gray-500 hover:text-red-400 rounded-lg bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/30 transition-colors touch-manipulation active:scale-95"
+                title="Șterge"
+              ><X :size="16" /></button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1583,6 +1661,7 @@ const totalExpenses = computed(() => totalFixed.value + totalVariable.value);
     <ExpenseAddModal />
     <GeminiReceiptModal />
     <ExpenseDetailModal />
+    <ExpenseExportPanel v-model="isExportPanelOpen" />
 
     <!-- Extra Income Modal -->
     <Teleport to="body">

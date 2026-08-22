@@ -150,6 +150,13 @@ const status = ref<'PAID' | 'DUE' | 'PENDING'>('PAID');
 const month = ref(financesStore.selectedMonth || '2026-07');
 const isRecurring = ref(true);
 
+const BUILTIN_TYPES: FinanceCategoryType[] = ['LOAN', 'SUBSCRIPTION', 'UTILITY', 'FOOD', 'VARIABLE', 'CIGARETTES', 'OTHER'];
+
+const allTypes = computed<{ value: FinanceCategoryType; label: string }[]>(() => [
+  ...BUILTIN_TYPES.map((code) => ({ value: code, label: t('enums.' + code, code) })),
+  ...(settings.value?.categoryTypes ?? []).map((ct) => ({ value: ct.code, label: ct.label }))
+]);
+
 const availableCategories = computed(() => {
   const all = settings.value?.categories || [];
   return all.filter((c) => c.type === type.value);
@@ -312,12 +319,7 @@ async function handleSubmit() {
             v-model="type"
             class="w-full bg-terminal-bg border border-terminal-border rounded px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-terminal-accent"
           >
-            <option value="LOAN">{{ t('enums.LOAN') }}</option>
-            <option value="SUBSCRIPTION">{{ t('enums.SUBSCRIPTION') }}</option>
-            <option value="UTILITY">{{ t('enums.UTILITY') }}</option>
-            <option value="FOOD">{{ t('enums.FOOD') }}</option>
-            <option value="CIGARETTES">{{ t('enums.CIGARETTES') }}</option>
-            <option value="OTHER">{{ t('enums.OTHER') }}</option>
+            <option v-for="opt in allTypes" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
         </FormField>
 

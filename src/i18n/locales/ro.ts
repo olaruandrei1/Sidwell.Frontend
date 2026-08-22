@@ -128,6 +128,7 @@ export const ro = {
     incomeLabel: 'Venit',
     subTabFixed: 'Fixe',
     subTabVariable: 'Variabile',
+    subTabOverview: 'General',
     totalLabel: 'Total',
     noFixedForMonth: 'Nicio cheltuială fixă pentru {month}.',
     noVariableForMonth: 'Nicio cheltuială variabilă pentru {month}.',
